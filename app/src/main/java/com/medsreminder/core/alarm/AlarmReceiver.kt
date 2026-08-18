@@ -6,6 +6,7 @@ import android.content.Intent
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
+import com.medsreminder.domain.scheduler.AlarmScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
@@ -20,6 +21,7 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
 
     private val groupDao: MedicationGroupDao by inject()
     private val personDao: PersonDao by inject()
+    private val alarmScheduler: AlarmScheduler by inject()
     private val notificationHelper: NotificationHelper by inject()
 
     companion object {
@@ -41,6 +43,8 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                     val person = personDao.getPersonById(groupWithMeds.group.personId).firstOrNull()
                     val personName = person?.name ?: "Usuario"
                     notificationHelper.showMedicationNotification(groupWithMeds, personName)
+                    // Automatically schedule next occurrence for tomorrow / next active day
+                    alarmScheduler.schedule(groupWithMeds.group)
                 }
             } finally {
                 pendingResult.finish()

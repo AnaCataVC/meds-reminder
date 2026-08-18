@@ -95,6 +95,13 @@ fun AddEditGroupScreen(
     var showInlineMedSheet by remember { mutableStateOf(false) }
     var showDeleteConfirm by remember { mutableStateOf(false) }
 
+    // Auto-select person if none selected yet and persons become available
+    LaunchedEffect(state.persons) {
+        if (selectedPersonId == 0L && state.persons.isNotEmpty()) {
+            selectedPersonId = state.selectedPersonId ?: state.persons.first().id
+        }
+    }
+
     // Ringtone Picker Intent Launcher
     val ringtonePickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -246,16 +253,29 @@ fun AddEditGroupScreen(
 
                 if (state.persons.isEmpty()) {
                     Surface(
-                        shape = RoundedCornerShape(10.dp),
-                        color = MaterialTheme.colorScheme.errorContainer,
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f),
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(
-                            text = "No tienes perfiles creados. Toca '+ Nueva Persona' para continuar.",
-                            color = MaterialTheme.colorScheme.onErrorContainer,
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(12.dp)
-                        )
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                text = "No tienes perfiles creados todavía. Crea un perfil para asignar este horario.",
+                                color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                            Button(
+                                onClick = { showInlinePersonSheet = true },
+                                colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                                contentPadding = PaddingValues(horizontal = 14.dp, vertical = 6.dp)
+                            ) {
+                                Icon(Icons.Default.PersonAdd, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Crear Primera Persona", fontSize = 13.sp)
+                            }
+                        }
                     }
                 } else {
                     FlowRow(
@@ -300,7 +320,12 @@ fun AddEditGroupScreen(
                     placeholder = { Text("ej. Dosis de la Mañana, Antes de Dormir") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = RoundedCornerShape(12.dp),
+                    supportingText = {
+                        if (name.isBlank()) {
+                            Text("Requerido para identificar el recordatorio", color = MaterialTheme.colorScheme.outline)
+                        }
+                    }
                 )
             }
 
@@ -524,6 +549,10 @@ fun AddEditGroupScreen(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Save Button
+            val isNameMissing = name.isBlank()
+            val isPersonMissing = selectedPersonId == 0L
+            val canSave = !isNameMissing && !isPersonMissing
+
             Button(
                 onClick = {
                     onIntent(
@@ -538,7 +567,7 @@ fun AddEditGroupScreen(
                         )
                     )
                 },
-                enabled = name.isNotBlank() && selectedPersonId != 0L,
+                enabled = canSave,
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(52.dp),
@@ -550,6 +579,19 @@ fun AddEditGroupScreen(
                     text = if (groupId == null) "Guardar y Activar Alarma" else "Actualizar Horario",
                     fontWeight = FontWeight.Bold,
                     fontSize = 16.sp
+                )
+            }
+
+            if (!canSave) {
+                val missingList = mutableListOf<String>()
+                if (isPersonMissing) missingList.add("seleccionar una persona (paso 1)")
+                if (isNameMissing) missingList.add("escribir el nombre del recordatorio (paso 2)")
+
+                Text(
+                    text = "⚠️ Para guardar debes: ${missingList.joinToString(" y ")}.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(top = 4.dp, start = 4.dp)
                 )
             }
 

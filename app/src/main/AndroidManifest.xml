@@ -4,11 +4,9 @@
     <!-- Notification Permission for Android 13+ (API 33+) -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
-    <!-- Exact Alarm for Medical Reminders (Pre-granted under Google Play Policy exception) -->
+    <!-- Exact Alarm for Medical Reminders (Android 12 to 16+) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
-    <uses-permission
-        android:name="android.permission.SCHEDULE_EXACT_ALARM"
-        android:maxSdkVersion="32" />
 
     <!-- Device Boot & Wake Lock for Resilient Alarm Scheduling -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />

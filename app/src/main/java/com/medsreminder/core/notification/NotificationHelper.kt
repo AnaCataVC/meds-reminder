@@ -7,6 +7,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
@@ -24,7 +25,7 @@ class NotificationHelper(private val context: Context) {
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     companion object {
-        const val DEFAULT_CHANNEL_ID = "meds_reminder_default_channel"
+        const val DEFAULT_CHANNEL_ID = "meds_reminder_alarm_channel_v2"
         const val ACTION_CONFIRM = "com.medsreminder.ACTION_CONFIRM"
         const val ACTION_SNOOZE_10 = "com.medsreminder.ACTION_SNOOZE_10"
         const val ACTION_POSTPONE_6H = "com.medsreminder.ACTION_POSTPONE_6H"
@@ -53,7 +54,8 @@ class NotificationHelper(private val context: Context) {
                 .build()
 
             val soundUri = ringtoneUriString?.let { Uri.parse(it) }
-                ?: android.provider.Settings.System.DEFAULT_NOTIFICATION_URI
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM)
+                ?: RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION)
 
             val channelName = if (ringtoneUriString.isNullOrBlank()) {
                 "Recordatorios de Medicamentos"
