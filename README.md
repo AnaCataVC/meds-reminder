@@ -43,6 +43,12 @@
    ```
 5. Run the app on an Android device or emulator running Android 8.0+ (API 26+).
 
+### 5. Battery Optimization & Background Execution
+To ensure medication alarms ring reliably on Android:
+* **Battery Optimization List Filter**: In system *Battery Optimization* settings, switch the top filter from *"Not optimized"* to *"All apps"*, find **Meds Reminder**, and set it to *"Don't optimize"*.
+* **App Info Settings**: Alternatively, navigate to *App Info -> Battery* and select **"Unrestricted"**.
+* **OEM Customizations**: On Xiaomi (MIUI/HyperOS) enable *Autostart*, and on Samsung add the app to *Never sleeping apps*.
+
 ---
 
 ## 🇪🇸 Versión en Español
@@ -77,3 +83,10 @@
    ./gradlew test
    ```
 5. Ejecuta la app en un emulador o dispositivo físico con Android 8.0+ (API 26+).
+
+### 5. Optimización de Batería y Ejecución en Segundo Plano
+Para asegurar que las alarmas de medicamentos suenen sin retraso en Android:
+* **Filtro de Optimización de Batería**: En los ajustes de *Optimización de batería*, cambia el selector superior de *"Sin optimizar"* a *"Todas las aplicaciones"*, localiza **Meds Reminder** y marca *"No optimizar"*.
+* **Ajuste Directo**: También puedes ir a *Información de la app -> Batería* y seleccionar **"Sin restricciones"**.
+* **Fabricantes OEM**: En Xiaomi activa *Inicio automático* y en Samsung agrega la app a *Aplicaciones nunca suspendidas*.
+
