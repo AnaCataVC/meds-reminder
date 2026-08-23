@@ -11,11 +11,16 @@ This document serves as the operational manual, architecture reference, and work
 ### Core Architecture & Modules:
 - **`app/src/main/java/com/medsreminder/`**:
   - **`data/`**:
-    - `local/`: Room Database (`AppDatabase`), DAOs, and entities (`MedicationEntity`, `ReminderLogEntity`).
-    - `repository/`: Repository implementations mediating between Room and ViewModels.
-  - **`domain/`**: Use cases for medication intake, rescheduling, and adherence analytics.
-  - **`ui/`**: Jetpack Compose UI screens (Dashboard, Medication Editor, History/Analytics, Settings), Material 3 design system, and ViewModel state holders.
-  - **`receiver/` & `service/`**: Broadcast receivers (`AlarmReceiver`, `BootReceiver`) for reliable notification delivery even after device reboots (`BOOT_COMPLETED`).
+    - `local/`: Room Database (`AppDatabase`), DAOs, and entities (`PersonEntity`, `MedicationEntity`, `MedicationGroupEntity`).
+    - `backup/`: Storage Access Framework (SAF) JSON backup & restore manager.
+  - **`domain/`**: Scheduling contracts (`AlarmScheduler`).
+  - **`ui/`**: 
+    - Jetpack Compose navigation & screens (`HorariosScreen`, `MedicamentosScreen`, `PerfilesScreen`, `AjustesScreen`, `AddEditGroupScreen`).
+    - **`alarm/`**: Full-screen interactive alarm activity (`AlarmActivity`) for lockscreen alerts.
+    - Dialogs, Material 3 design system, and `MainViewModel`.
+  - **`core/alarm/` & `core/notification/`**: 
+    - Broadcast receivers (`AlarmReceiver`, `BootReceiver`, `NotificationActionReceiver`).
+    - `NotificationHelper` for dynamic ringtone channels and silent pre-alarm channels.
 - **`releases/`**: Production and debug APKs (`meds-reminder-vX.Y.Z-release.apk`).
 
 ---
