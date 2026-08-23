@@ -28,6 +28,8 @@ sealed interface MainUiIntent {
     data class SelectPerson(val personId: Long?) : MainUiIntent
     data class SavePerson(val id: Long = 0, val name: String, val colorHex: String) : MainUiIntent
     data class DeletePerson(val person: PersonEntity) : MainUiIntent
+    data class SuspendPerson(val personId: Long, val hours: Int?, val untilEndOfDay: Boolean = false) : MainUiIntent
+    data class ResumePerson(val personId: Long) : MainUiIntent
 
     // Medication Actions
     data class SaveMedication(
@@ -50,7 +52,8 @@ sealed interface MainUiIntent {
         val scheduledTime: LocalTime,
         val ringtoneUriString: String?,
         val daysOfWeekMask: Int,
-        val medicationIds: List<Long>
+        val medicationIds: List<Long>,
+        val advanceNoticeMinutes: Int = 15
     ) : MainUiIntent
     data class DeleteGroup(val groupId: Long) : MainUiIntent
     data class TestAlarm(val groupId: Long) : MainUiIntent

@@ -41,6 +41,8 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                         // Mark today's dose as completed
                         groupDao.markGroupAsTaken(groupId, today)
                         notificationHelper.cancelNotification(notificationId)
+                        // Cancel the main exact alarm for today if confirmed early from pre-alarm
+                        notificationHelper.cancelNotification(groupId.toInt())
                         // Schedule next regular alarm cycle
                         alarmScheduler.schedule(group)
                     }
@@ -65,7 +67,14 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                         // Skip dose for today without changing overall active state
                         groupDao.markGroupSkippedToday(groupId, today)
                         notificationHelper.cancelNotification(notificationId)
+                        // Also dismiss main notification if active
+                        notificationHelper.cancelNotification(groupId.toInt())
                         alarmScheduler.schedule(group)
+                    }
+
+                    NotificationHelper.ACTION_DISMISS_PRE_ALARM -> {
+                        // Just dismiss the advance notification; exact alarm will still ring at scheduled time
+                        notificationHelper.cancelNotification(notificationId)
                     }
                 }
             } finally {

@@ -102,6 +102,17 @@ fun HorariosScreen(
                 onAddPersonClick = { showAddPersonSheet = true }
             )
 
+            // Active Person Suspension Banner (if filtered person is suspended or options)
+            val selectedPerson = state.persons.find { it.id == state.selectedPersonId }
+            if (selectedPerson != null) {
+                PersonSuspensionStatusBanner(
+                    person = selectedPerson,
+                    onSuspend6h = { onIntent(MainUiIntent.SuspendPerson(selectedPerson.id, hours = 6)) },
+                    onSuspendToday = { onIntent(MainUiIntent.SuspendPerson(selectedPerson.id, hours = null, untilEndOfDay = true)) },
+                    onResume = { onIntent(MainUiIntent.ResumePerson(selectedPerson.id)) }
+                )
+            }
+
             // Groups List
             if (state.groupsWithMedications.isEmpty() && !state.isLoading) {
                 EmptyHorariosPlaceholder(
@@ -210,6 +221,89 @@ private fun PersonFilterBar(
                     )
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun PersonSuspensionStatusBanner(
+    person: PersonEntity,
+    onSuspend6h: () -> Unit,
+    onSuspendToday: () -> Unit,
+    onResume: () -> Unit
+) {
+    val isSuspended = person.suspendedUntilEpochMs?.let { it > System.currentTimeMillis() } ?: false
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 4.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isSuspended) {
+                MaterialTheme.colorScheme.tertiaryContainer
+            } else {
+                MaterialTheme.colorScheme.surfaceContainer
+            }
+        ),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 12.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = if (isSuspended) Icons.Default.Snooze else Icons.Outlined.Alarm,
+                    contentDescription = null,
+                    tint = if (isSuspended) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.primary,
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Column {
+                    Text(
+                        text = if (isSuspended) "Alarmas de ${person.name} pausadas" else "Pausar alarmas de ${person.name}",
+                        style = MaterialTheme.typography.labelLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = if (isSuspended) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = if (isSuspended) "Se reactivarán automáticamente al vencer el plazo." else "Suspende todos sus recordatorios temporalmente.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isSuspended) MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline
+                    )
+                }
+            }
+
+            if (isSuspended) {
+                Button(
+                    onClick = onResume,
+                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                ) {
+                    Text("Reanudar", fontSize = 12.sp)
+                }
+            } else {
+                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    FilledTonalButton(
+                        onClick = onSuspend6h,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("6h", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                    FilledTonalButton(
+                        onClick = onSuspendToday,
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                    ) {
+                        Text("Hoy", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+            }
         }
     }
 }

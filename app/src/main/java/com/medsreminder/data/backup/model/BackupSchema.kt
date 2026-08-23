@@ -57,6 +57,8 @@ data class MedicationGroupDto(
     val isActive: Boolean = true,
     @SerialName("days_of_week_mask")
     val daysOfWeekMask: Int = 127,
+    @SerialName("advance_notice_minutes")
+    val advanceNoticeMinutes: Int = 15,
     @SerialName("medication_ids")
     val medicationIds: List<Long>
 )

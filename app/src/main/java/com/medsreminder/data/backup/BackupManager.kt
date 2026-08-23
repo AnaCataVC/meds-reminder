@@ -68,6 +68,7 @@ class BackupManager(
                     ringtoneUriString = item.group.ringtoneUriString,
                     isActive = item.group.isActive,
                     daysOfWeekMask = item.group.daysOfWeekMask,
+                    advanceNoticeMinutes = item.group.advanceNoticeMinutes,
                     medicationIds = item.medications.map { it.id }
                 )
             }
@@ -141,7 +142,8 @@ class BackupManager(
                             scheduledTime = LocalTime.parse(gDto.scheduledTime),
                             ringtoneUriString = gDto.ringtoneUriString,
                             isActive = gDto.isActive,
-                            daysOfWeekMask = gDto.daysOfWeekMask
+                            daysOfWeekMask = gDto.daysOfWeekMask,
+                            advanceNoticeMinutes = gDto.advanceNoticeMinutes
                         ),
                         medicationIds = gDto.medicationIds
                     )

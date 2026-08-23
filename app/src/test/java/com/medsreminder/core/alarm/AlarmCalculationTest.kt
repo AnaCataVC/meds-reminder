@@ -63,4 +63,28 @@ class AlarmCalculationTest {
         assertEquals(expectedEpoch, triggerEpoch)
         assertTrue(triggerEpoch > referenceNow.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli())
     }
+
+    @Test
+    fun `pre-alarm offset calculation matches advance notice minutes`() {
+        val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 0)
+        val targetTime = LocalTime.of(14, 0) // 02:00 PM
+        val group = MedicationGroupEntity(
+            id = 1,
+            personId = 1,
+            name = "Afternoon Dose",
+            scheduledTime = targetTime,
+            daysOfWeekMask = 127,
+            advanceNoticeMinutes = 15
+        )
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val preAlarmEpoch = triggerEpoch - (group.advanceNoticeMinutes * 60 * 1000L)
+
+        val expectedPreAlarmEpoch = LocalDateTime.of(2026, 8, 17, 13, 45)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(expectedPreAlarmEpoch, preAlarmEpoch)
+    }
 }

@@ -86,6 +86,9 @@ fun AddEditGroupScreen(
     var daysOfWeekMask by remember(existingGroup) {
         mutableStateOf(existingGroup?.group?.daysOfWeekMask ?: 127)
     }
+    var advanceNoticeMinutes by remember(existingGroup) {
+        mutableStateOf(existingGroup?.group?.advanceNoticeMinutes ?: 15)
+    }
     var selectedMedicationIds by remember(existingGroup) {
         mutableStateOf(existingGroup?.medications?.map { it.id }?.toSet() ?: emptySet())
     }
@@ -495,10 +498,49 @@ fun AddEditGroupScreen(
                 }
             }
 
-            // 6. Días de la Semana
+            // 6. Aviso Previo Silencioso
             Column {
                 Text(
-                    text = "6. Días de repetición",
+                    text = "6. Aviso Previo Silencioso",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Recibe una notificación silenciosa antes de que suene la alarma para tomarla o cancelarla por hoy.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf(
+                        0 to "Sin aviso",
+                        15 to "15 min antes",
+                        30 to "30 min antes"
+                    ).forEach { (mins, label) ->
+                        val isSelected = advanceNoticeMinutes == mins
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = { advanceNoticeMinutes = mins },
+                            label = { Text(label) },
+                            leadingIcon = {
+                                if (isSelected) {
+                                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                }
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+            }
+
+            // 7. Días de la Semana
+            Column {
+                Text(
+                    text = "7. Días de repetición",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -563,7 +605,8 @@ fun AddEditGroupScreen(
                             scheduledTime = scheduledTime,
                             ringtoneUriString = ringtoneUriString,
                             daysOfWeekMask = if (daysOfWeekMask == 0) 127 else daysOfWeekMask,
-                            medicationIds = selectedMedicationIds.toList()
+                            medicationIds = selectedMedicationIds.toList(),
+                            advanceNoticeMinutes = advanceNoticeMinutes
                         )
                     )
                 },

@@ -84,6 +84,8 @@ class MainViewModel(
             is MainUiIntent.SelectPerson -> _selectedPersonId.value = intent.personId
             is MainUiIntent.SavePerson -> savePerson(intent.id, intent.name, intent.colorHex)
             is MainUiIntent.DeletePerson -> deletePerson(intent.person)
+            is MainUiIntent.SuspendPerson -> suspendPerson(intent.personId, intent.hours, intent.untilEndOfDay)
+            is MainUiIntent.ResumePerson -> resumePerson(intent.personId)
 
             is MainUiIntent.SaveMedication -> saveMedication(
                 intent.id,
@@ -105,6 +107,30 @@ class MainViewModel(
             is MainUiIntent.ImportBackup -> importBackup(intent.uri)
             is MainUiIntent.RefreshPermissions -> checkExactAlarmPermission()
             is MainUiIntent.ClearMessage -> _userMessage.value = null
+        }
+    }
+
+    private fun suspendPerson(personId: Long, hours: Int?, untilEndOfDay: Boolean) {
+        viewModelScope.launch {
+            val untilEpochMs = if (untilEndOfDay) {
+                java.time.LocalDate.now().atTime(java.time.LocalTime.MAX)
+                    .atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+            } else if (hours != null) {
+                System.currentTimeMillis() + (hours * 3600 * 1000L)
+            } else {
+                null
+            }
+
+            personDao.setSuspendedUntil(personId, untilEpochMs)
+            val durationLabel = if (untilEndOfDay) "el resto del día" else "${hours}h"
+            _sideEffects.send(MainSideEffect.ShowSnackbar("Alarmas pausadas por $durationLabel"))
+        }
+    }
+
+    private fun resumePerson(personId: Long) {
+        viewModelScope.launch {
+            personDao.setSuspendedUntil(personId, null)
+            _sideEffects.send(MainSideEffect.ShowSnackbar("Alarmas reanudadas"))
         }
     }
 
@@ -174,7 +200,8 @@ class MainViewModel(
                 scheduledTime = intent.scheduledTime,
                 ringtoneUriString = intent.ringtoneUriString,
                 daysOfWeekMask = intent.daysOfWeekMask,
-                isActive = true
+                isActive = true,
+                advanceNoticeMinutes = intent.advanceNoticeMinutes
             )
 
             val savedId = groupDao.saveGroupWithMedicationIds(group, intent.medicationIds)

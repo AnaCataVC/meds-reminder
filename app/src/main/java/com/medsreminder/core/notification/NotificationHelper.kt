@@ -26,10 +26,13 @@ class NotificationHelper(private val context: Context) {
 
     companion object {
         const val DEFAULT_CHANNEL_ID = "meds_reminder_alarm_channel_v2"
+        const val PRE_ALARM_CHANNEL_ID = "meds_pre_alarm_silent_channel"
+
         const val ACTION_CONFIRM = "com.medsreminder.ACTION_CONFIRM"
         const val ACTION_SNOOZE_10 = "com.medsreminder.ACTION_SNOOZE_10"
         const val ACTION_POSTPONE_6H = "com.medsreminder.ACTION_POSTPONE_6H"
         const val ACTION_CANCEL_TODAY = "com.medsreminder.ACTION_CANCEL_TODAY"
+        const val ACTION_DISMISS_PRE_ALARM = "com.medsreminder.ACTION_DISMISS_PRE_ALARM"
 
         const val EXTRA_GROUP_ID = "extra_group_id"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
@@ -81,7 +84,29 @@ class NotificationHelper(private val context: Context) {
     }
 
     /**
-     * Builds and presents an ongoing, interactive medication notification.
+     * Resolves or registers a silent low-priority channel for advance notifications.
+     */
+    fun getOrCreatePreAlarmChannel(): String {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (notificationManager.getNotificationChannel(PRE_ALARM_CHANNEL_ID) == null) {
+                val channel = NotificationChannel(
+                    PRE_ALARM_CHANNEL_ID,
+                    "Avisos Previos Silenciosos",
+                    NotificationManager.IMPORTANCE_LOW
+                ).apply {
+                    description = "Notificaciones anticipadas sin sonido antes de que suene la alarma"
+                    enableVibration(false)
+                    setSound(null, null)
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                }
+                notificationManager.createNotificationChannel(channel)
+            }
+        }
+        return PRE_ALARM_CHANNEL_ID
+    }
+
+    /**
+     * Builds and presents an ongoing, interactive medication notification with Full Screen Intent popup.
      */
     fun showMedicationNotification(
         groupWithMeds: MedicationGroupWithMedications,
@@ -90,6 +115,9 @@ class NotificationHelper(private val context: Context) {
         val group = groupWithMeds.group
         val channelId = getOrCreateChannelForSound(group.ringtoneUriString)
         val notificationId = group.id.toInt()
+
+        // Cancel any pending pre-alarm notification for this group
+        cancelNotification(notificationId + 100000)
 
         val medListSummary = if (groupWithMeds.medications.isEmpty()) {
             "Sin medicamentos asignados"
@@ -109,6 +137,18 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Full Screen Popup Intent (AlarmActivity)
+        val fullScreenIntent = Intent(context, com.medsreminder.ui.alarm.AlarmActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(com.medsreminder.ui.alarm.AlarmActivity.EXTRA_GROUP_ID, group.id)
+        }
+        val fullScreenPendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId + 50000,
+            fullScreenIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         // Action PendingIntents
         val confirmIntent = createActionPendingIntent(ACTION_CONFIRM, group.id, notificationId, 1)
         val snoozeIntent = createActionPendingIntent(ACTION_SNOOZE_10, group.id, notificationId, 2)
@@ -125,6 +165,7 @@ class NotificationHelper(private val context: Context) {
                 )
             )
             .setContentIntent(contentPendingIntent)
+            .setFullScreenIntent(fullScreenPendingIntent, true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setAutoCancel(false)
@@ -133,6 +174,61 @@ class NotificationHelper(private val context: Context) {
             .addAction(R.drawable.ic_snooze, "⏳ 10 min", snoozeIntent)
             .addAction(R.drawable.ic_schedule, "🕒 +6h", postponeIntent)
             .addAction(R.drawable.ic_close, "❌ Cancelar hoy", cancelIntent)
+            .build()
+
+        notificationManager.notify(notificationId, notification)
+    }
+
+    /**
+     * Builds and presents a silent advance warning notification (15/30 mins before alarm).
+     */
+    fun showPreAlarmNotification(
+        groupWithMeds: MedicationGroupWithMedications,
+        personName: String,
+        minutesBefore: Int
+    ) {
+        val group = groupWithMeds.group
+        val channelId = getOrCreatePreAlarmChannel()
+        val notificationId = group.id.toInt() + 100000
+
+        val medListSummary = if (groupWithMeds.medications.isEmpty()) {
+            "Sin medicamentos asignados"
+        } else {
+            groupWithMeds.medications.joinToString(", ") {
+                "${it.name}${it.dosage?.let { d -> " ($d)" } ?: ""}"
+            }
+        }
+
+        val openAppIntent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        }
+        val contentPendingIntent = PendingIntent.getActivity(
+            context,
+            notificationId,
+            openAppIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val confirmIntent = createActionPendingIntent(ACTION_CONFIRM, group.id, notificationId, 11)
+        val cancelIntent = createActionPendingIntent(ACTION_CANCEL_TODAY, group.id, notificationId, 12)
+        val dismissIntent = createActionPendingIntent(ACTION_DISMISS_PRE_ALARM, group.id, notificationId, 13)
+
+        val notification = NotificationCompat.Builder(context, channelId)
+            .setSmallIcon(R.drawable.ic_medication)
+            .setContentTitle("🔔 Próxima toma en $minutesBefore min: ${group.name}")
+            .setContentText("Para $personName: $medListSummary (${group.scheduledTime})")
+            .setStyle(
+                NotificationCompat.BigTextStyle().bigText(
+                    "Para $personName:\n$medListSummary\n\nHora programada: ${group.scheduledTime}\n¿Quieres tomarlo ya o desactivar la alarma de hoy?"
+                )
+            )
+            .setContentIntent(contentPendingIntent)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .addAction(R.drawable.ic_check, "✅ Tomar ya", confirmIntent)
+            .addAction(R.drawable.ic_close, "❌ Desactivar hoy", cancelIntent)
+            .addAction(R.drawable.ic_snooze, "Silenciar", dismissIntent)
             .build()
 
         notificationManager.notify(notificationId, notification)
@@ -153,7 +249,7 @@ class NotificationHelper(private val context: Context) {
             putExtra(EXTRA_GROUP_ID, groupId)
             putExtra(EXTRA_NOTIFICATION_ID, notificationId)
         }
-        val requestCode = (groupId * 10 + suffix).toInt()
+        val requestCode = (groupId * 100 + suffix).toInt()
         return PendingIntent.getBroadcast(
             context,
             requestCode,

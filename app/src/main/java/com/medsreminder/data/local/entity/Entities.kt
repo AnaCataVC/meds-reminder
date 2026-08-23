@@ -19,7 +19,9 @@ data class PersonEntity(
     @ColumnInfo(name = "color_hex")
     val colorHex: String,
     @ColumnInfo(name = "created_at_epoch_ms")
-    val createdAtEpochMs: Long = System.currentTimeMillis()
+    val createdAtEpochMs: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "suspended_until_epoch_ms")
+    val suspendedUntilEpochMs: Long? = null
 )
 
 /**
@@ -71,7 +73,9 @@ data class MedicationGroupEntity(
     @ColumnInfo(name = "last_taken_date")
     val lastTakenDate: LocalDate? = null, // Ephemeral day tracking (no log history bloat)
     @ColumnInfo(name = "snooze_until_epoch_ms")
-    val snoozeUntilEpochMs: Long? = null
+    val snoozeUntilEpochMs: Long? = null,
+    @ColumnInfo(name = "advance_notice_minutes", defaultValue = "15")
+    val advanceNoticeMinutes: Int = 15 // 0 = disabled, 15 = 15m before, 30 = 30m before
 )
 
 /**

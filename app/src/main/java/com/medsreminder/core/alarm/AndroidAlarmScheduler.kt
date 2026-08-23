@@ -31,6 +31,16 @@ class AndroidAlarmScheduler(
         }
         val triggerEpochMs = calculateNextTriggerTime(group)
         setExactAlarmClock(group.id, triggerEpochMs)
+
+        // Schedule silent pre-alarm if enabled
+        if (group.advanceNoticeMinutes > 0) {
+            val preTriggerEpochMs = triggerEpochMs - (group.advanceNoticeMinutes * 60 * 1000L)
+            if (preTriggerEpochMs > System.currentTimeMillis()) {
+                setPreAlarm(group.id, preTriggerEpochMs)
+            }
+        } else {
+            cancelPreAlarm(group.id)
+        }
     }
 
     override fun scheduleSnooze(groupId: Long, triggerAtEpochMs: Long) {
@@ -41,6 +51,13 @@ class AndroidAlarmScheduler(
         val pendingIntent = createPendingIntent(group.id)
         alarmManager.cancel(pendingIntent)
         pendingIntent.cancel()
+        cancelPreAlarm(group.id)
+    }
+
+    fun cancelPreAlarm(groupId: Long) {
+        val prePendingIntent = createPreAlarmPendingIntent(groupId)
+        alarmManager.cancel(prePendingIntent)
+        prePendingIntent.cancel()
     }
 
     override suspend fun rescheduleAllActive() = withContext(Dispatchers.IO) {
@@ -69,6 +86,15 @@ class AndroidAlarmScheduler(
         alarmManager.setAlarmClock(alarmClockInfo, pendingIntent)
     }
 
+    private fun setPreAlarm(groupId: Long, preTriggerEpochMs: Long) {
+        val prePendingIntent = createPreAlarmPendingIntent(groupId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, preTriggerEpochMs, prePendingIntent)
+        } else {
+            alarmManager.setExact(AlarmManager.RTC_WAKEUP, preTriggerEpochMs, prePendingIntent)
+        }
+    }
+
     private fun createPendingIntent(groupId: Long): PendingIntent {
         val intent = Intent(context, AlarmReceiver::class.java).apply {
             action = AlarmReceiver.ACTION_FIRE_ALARM
@@ -77,6 +103,19 @@ class AndroidAlarmScheduler(
         return PendingIntent.getBroadcast(
             context,
             groupId.toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+    }
+
+    private fun createPreAlarmPendingIntent(groupId: Long): PendingIntent {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = AlarmReceiver.ACTION_PRE_ALARM
+            putExtra(AlarmReceiver.EXTRA_GROUP_ID, groupId)
+        }
+        return PendingIntent.getBroadcast(
+            context,
+            (groupId + 100000).toInt(),
             intent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )

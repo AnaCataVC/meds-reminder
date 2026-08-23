@@ -22,8 +22,11 @@ import com.medsreminder.data.local.entity.PersonEntity
         MedicationGroupEntity::class,
         MedicationGroupCrossRef::class
     ],
-    version = 1,
-    exportSchema = true
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [
+        androidx.room.AutoMigration(from = 1, to = 2)
+    ]
 )
 @TypeConverters(RoomConverters::class)
 abstract class AppDatabase : RoomDatabase() {

@@ -26,11 +26,13 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
 
     companion object {
         const val ACTION_FIRE_ALARM = "com.medsreminder.ACTION_FIRE_ALARM"
+        const val ACTION_PRE_ALARM = "com.medsreminder.ACTION_PRE_ALARM"
         const val EXTRA_GROUP_ID = "extra_group_id"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action != ACTION_FIRE_ALARM) return
+        val action = intent.action ?: return
+        if (action != ACTION_FIRE_ALARM && action != ACTION_PRE_ALARM) return
 
         val groupId = intent.getLongExtra(EXTRA_GROUP_ID, -1L)
         if (groupId == -1L) return
@@ -42,9 +44,28 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                 if (groupWithMeds != null && groupWithMeds.group.isActive) {
                     val person = personDao.getPersonById(groupWithMeds.group.personId).firstOrNull()
                     val personName = person?.name ?: "Usuario"
-                    notificationHelper.showMedicationNotification(groupWithMeds, personName)
-                    // Automatically schedule next occurrence for tomorrow / next active day
-                    alarmScheduler.schedule(groupWithMeds.group)
+
+                    // Check if person's alarms are currently suspended
+                    val isPersonSuspended = person?.suspendedUntilEpochMs?.let { it > System.currentTimeMillis() } ?: false
+                    if (isPersonSuspended) {
+                        if (action == ACTION_FIRE_ALARM) {
+                            // Automatically reschedule for tomorrow when main alarm time is reached
+                            alarmScheduler.schedule(groupWithMeds.group)
+                        }
+                        return@launch
+                    }
+
+                    if (action == ACTION_FIRE_ALARM) {
+                        notificationHelper.showMedicationNotification(groupWithMeds, personName)
+                        // Automatically schedule next occurrence for tomorrow / next active day
+                        alarmScheduler.schedule(groupWithMeds.group)
+                    } else if (action == ACTION_PRE_ALARM) {
+                        notificationHelper.showPreAlarmNotification(
+                            groupWithMeds = groupWithMeds,
+                            personName = personName,
+                            minutesBefore = groupWithMeds.group.advanceNoticeMinutes
+                        )
+                    }
                 }
             } finally {
                 pendingResult.finish()

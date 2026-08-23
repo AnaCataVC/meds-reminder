@@ -18,6 +18,9 @@ interface PersonDao {
     @Query("SELECT * FROM persons WHERE id = :id")
     fun getPersonById(id: Long): Flow<PersonEntity?>
 
+    @Query("UPDATE persons SET suspended_until_epoch_ms = :suspendedUntilEpochMs WHERE id = :personId")
+    suspend fun setSuspendedUntil(personId: Long, suspendedUntilEpochMs: Long?)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPerson(person: PersonEntity): Long
 
