@@ -338,13 +338,11 @@ private fun HorarioReminderCard(
             .clickable { onClickEdit() },
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
-            containerColor = if (isTakenToday) {
-                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f)
-            } else {
-                MaterialTheme.colorScheme.surfaceContainerLow
-            }
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(
+            defaultElevation = if (isTakenToday) 1.dp else 2.dp
+        )
     ) {
         Column(
             modifier = Modifier
@@ -502,7 +500,7 @@ private fun HorarioReminderCard(
                     Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = if (isTakenToday) "¡Listo!" else "Tomar",
+                        text = if (isTakenToday) "¡Listo!" else "Marcar tomado",
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp
                     )

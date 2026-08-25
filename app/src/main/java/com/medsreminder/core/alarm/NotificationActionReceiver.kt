@@ -41,10 +41,11 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                         // Mark today's dose as completed
                         groupDao.markGroupAsTaken(groupId, today)
                         notificationHelper.cancelNotification(notificationId)
-                        // Cancel the main exact alarm for today if confirmed early from pre-alarm
                         notificationHelper.cancelNotification(groupId.toInt())
-                        // Schedule next regular alarm cycle
-                        alarmScheduler.schedule(group)
+                        notificationHelper.cancelNotification(groupId.toInt() + 100000)
+                        // Schedule next regular alarm cycle with updated date
+                        val updatedGroup = group.copy(lastTakenDate = today, snoozeUntilEpochMs = null)
+                        alarmScheduler.schedule(updatedGroup)
                     }
 
                     NotificationHelper.ACTION_SNOOZE_10 -> {

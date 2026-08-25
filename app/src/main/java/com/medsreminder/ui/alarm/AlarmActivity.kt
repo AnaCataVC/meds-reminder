@@ -98,7 +98,9 @@ class AlarmActivity : ComponentActivity() {
                                 val today = LocalDate.now()
                                 groupDao.markGroupAsTaken(groupId, today)
                                 notificationHelper.cancelNotification(groupId.toInt())
-                                alarmScheduler.schedule(groupWithMeds!!.group)
+                                notificationHelper.cancelNotification(groupId.toInt() + 100000)
+                                val updatedGroup = groupWithMeds!!.group.copy(lastTakenDate = today, snoozeUntilEpochMs = null)
+                                alarmScheduler.schedule(updatedGroup)
                                 withContext(Dispatchers.Main) { finish() }
                             }
                         },
@@ -107,6 +109,7 @@ class AlarmActivity : ComponentActivity() {
                                 val snoozeEpoch = System.currentTimeMillis() + (10 * 60 * 1000L)
                                 groupDao.setSnoozeTime(groupId, snoozeEpoch)
                                 notificationHelper.cancelNotification(groupId.toInt())
+                                notificationHelper.cancelNotification(groupId.toInt() + 100000)
                                 alarmScheduler.scheduleSnooze(groupId, snoozeEpoch)
                                 withContext(Dispatchers.Main) { finish() }
                             }
@@ -116,7 +119,9 @@ class AlarmActivity : ComponentActivity() {
                                 val today = LocalDate.now()
                                 groupDao.markGroupSkippedToday(groupId, today)
                                 notificationHelper.cancelNotification(groupId.toInt())
-                                alarmScheduler.schedule(groupWithMeds!!.group)
+                                notificationHelper.cancelNotification(groupId.toInt() + 100000)
+                                val updatedGroup = groupWithMeds!!.group.copy(lastTakenDate = today, snoozeUntilEpochMs = null)
+                                alarmScheduler.schedule(updatedGroup)
                                 withContext(Dispatchers.Main) { finish() }
                             }
                         }

@@ -45,11 +45,14 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                     val person = personDao.getPersonById(groupWithMeds.group.personId).firstOrNull()
                     val personName = person?.name ?: "Usuario"
 
+                    val today = java.time.LocalDate.now()
+                    val isAlreadyTakenToday = groupWithMeds.group.lastTakenDate?.isEqual(today) == true
+
                     // Check if person's alarms are currently suspended
                     val isPersonSuspended = person?.suspendedUntilEpochMs?.let { it > System.currentTimeMillis() } ?: false
-                    if (isPersonSuspended) {
+                    if (isPersonSuspended || isAlreadyTakenToday) {
                         if (action == ACTION_FIRE_ALARM) {
-                            // Automatically reschedule for tomorrow when main alarm time is reached
+                            // Automatically reschedule for tomorrow / next active day
                             alarmScheduler.schedule(groupWithMeds.group)
                         }
                         return@launch

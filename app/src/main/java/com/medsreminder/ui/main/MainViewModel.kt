@@ -242,6 +242,16 @@ class MainViewModel(
         viewModelScope.launch {
             val today = LocalDate.now()
             groupDao.markGroupAsTaken(groupId, today)
+            notificationHelper.cancelNotification(groupId.toInt())
+            notificationHelper.cancelNotification(groupId.toInt() + 100000)
+            val groupWithMeds = groupDao.getGroupById(groupId)
+            if (groupWithMeds != null) {
+                // Cancel existing pending alarm/snooze and reschedule next occurrence
+                alarmScheduler.cancel(groupWithMeds.group)
+                if (groupWithMeds.group.isActive) {
+                    alarmScheduler.schedule(groupWithMeds.group)
+                }
+            }
             _sideEffects.send(MainSideEffect.ShowSnackbar("¡Toma confirmada para hoy!"))
         }
     }

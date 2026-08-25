@@ -87,4 +87,53 @@ class AlarmCalculationTest {
 
         assertEquals(expectedPreAlarmEpoch, preAlarmEpoch)
     }
+
+    @Test
+    fun `calculateNextTriggerTime rolls over to tomorrow if medication was already taken today before scheduled time`() {
+        // Reference time is 08:00 AM on Monday (2026-08-17), scheduled time is 14:00 (in the future today)
+        val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 0)
+        val targetTime = LocalTime.of(14, 0) // 02:00 PM
+        val group = MedicationGroupEntity(
+            id = 1,
+            personId = 1,
+            name = "Afternoon Dose",
+            scheduledTime = targetTime,
+            daysOfWeekMask = 127, // Everyday
+            lastTakenDate = java.time.LocalDate.of(2026, 8, 17) // Already taken today!
+        )
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        // Must be scheduled for tomorrow (2026-08-18 14:00), not today
+        val expectedEpoch = LocalDateTime.of(2026, 8, 18, 14, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(expectedEpoch, triggerEpoch)
+    }
+
+    @Test
+    fun `calculateNextTriggerTime respects dayOfWeek mask when taken today on selective days`() {
+        // Reference time is Monday morning (2026-08-17). Group is only scheduled for Mon(1), Wed(4) -> mask = 1 + 4 = 5
+        val referenceNow = LocalDateTime.of(2026, 8, 17, 9, 0)
+        val targetTime = LocalTime.of(12, 0)
+        val monWedMask = 1 or (1 shl (java.time.DayOfWeek.WEDNESDAY.value - 1))
+        val group = MedicationGroupEntity(
+            id = 2,
+            personId = 1,
+            name = "Mon-Wed Dose",
+            scheduledTime = targetTime,
+            daysOfWeekMask = monWedMask,
+            lastTakenDate = java.time.LocalDate.of(2026, 8, 17) // Taken Monday early
+        )
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        // Next occurrence should be Wednesday (2026-08-19 12:00)
+        val expectedEpoch = LocalDateTime.of(2026, 8, 19, 12, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(expectedEpoch, triggerEpoch)
+    }
 }
