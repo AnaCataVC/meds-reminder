@@ -1,6 +1,6 @@
 # 💊 Meds Reminder — Native Android Application
 
-[![Version](https://img.shields.io/badge/Version-1.1.0-emerald.svg?style=flat)](releases/)
+[![Version](https://img.shields.io/badge/Version-1.2.0-emerald.svg?style=flat)](releases/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
 [![Room](https://img.shields.io/badge/Room%20DB-2.6.1-3DDC84.svg?style=flat&logo=sqlite)](https://developer.android.com/training/data-storage/room)
@@ -32,7 +32,7 @@
   * Full-Screen Intents (`USE_FULL_SCREEN_INTENT`) with `KeyguardManager` and `setTurnScreenOn`
 
 ### 3. Deterministic Alarm Architecture
-In version 1.1.0, the alarm engine was comprehensively remediated into a robust, deterministic system that completely eliminates race conditions:
+In version 1.2.0, the alarm engine was comprehensively remediated into a robust, deterministic system that completely eliminates race conditions:
 * **Room as Single Source of Truth (SSOT):** All intake logs, postponements, and schedule alterations mutate Room entities first (`markGroupAsTaken`, `setSnoozeTime`, `markGroupSkippedToday`). UI layers, broadcast receivers, and system schedulers query Room state directly, eliminating in-memory stale references and dual-dispatch bugs.
 * **`MedicationScheduleRepository` Contract:** Centralized domain coordinator that guarantees atomic state transitions. When a medication intake is confirmed, snoozed, or skipped, the repository atomically:
   1. Updates the underlying Room database row.
@@ -89,7 +89,7 @@ To ensure medication alarms ring reliably on Android:
   * Full-Screen Intents (`USE_FULL_SCREEN_INTENT`) con `KeyguardManager` y `setTurnScreenOn`
 
 ### 3. Arquitectura Determinista de Alarmas
-En la versión 1.1.0, el motor de alarmas fue rediseñado exhaustivamente para garantizar una ejecución determinista y eliminar condiciones de carrera:
+En la versión 1.2.0, el motor de alarmas fue rediseñado exhaustivamente para garantizar una ejecución determinista y eliminar condiciones de carrera:
 * **Room como Fuente Única de Verdad (SSOT):** Todos los registros de toma, aplazamientos y modificaciones de horarios mutan en primer lugar la base de datos Room (`markGroupAsTaken`, `setSnoozeTime`, `markGroupSkippedToday`). La interfaz de usuario, los receptores del sistema y los planificadores consultan el estado directo de Room, evitando desfasajes de memoria y dobles alertas.
 * **Contrato `MedicationScheduleRepository`:** Coordinador de dominio que garantiza atomicidad. Cuando una dosis se confirma, pospone o descarta, el repositorio ejecuta de forma atómica:
   1. La actualización del registro en Room.
