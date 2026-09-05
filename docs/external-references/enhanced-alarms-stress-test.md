@@ -36,8 +36,8 @@ A thorough adversarial analysis was conducted on the implementation across 5 fai
 ### 🟡 Vector 3: Backup & Serialization Backward Compatibility (Hardened)
 - **Vulnerability**: Adding `advance_notice_minutes` could break existing JSON backup imports or omit the field during exports.
 - **Mitigation Implemented**:
-  - Added `@SerialName("advance_notice_minutes") val advanceNoticeMinutes: Int = 15` to [`MedicationGroupDto`](file:///c:/Users/anaca/Repos/meds-reminder/app/src/main/java/com/medsreminder/data/backup/model/BackupSchema.kt) with default fallback `15`.
-  - Updated [`BackupManager`](file:///c:/Users/anaca/Repos/meds-reminder/app/src/main/java/com/medsreminder/data/backup/BackupManager.kt) to map this property during export and restore.
+  - Added `@SerialName("advance_notice_minutes") val advanceNoticeMinutes: Int = 15` to `MedicationGroupDto` (`app/src/main/java/com/medsreminder/data/backup/model/BackupSchema.kt`) with default fallback `15`.
+  - Updated `BackupManager` (`app/src/main/java/com/medsreminder/data/backup/BackupManager.kt`) to map this property during export and restore.
   - Room auto-migration has `defaultValue = "15"` to ensure zero SQLite schema errors on existing databases.
 
 ### 🟢 Vector 4: Android 14/15/16 Exact Alarm & Full-Screen Intent Policies
