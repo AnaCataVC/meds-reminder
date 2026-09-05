@@ -36,6 +36,9 @@ class NotificationHelper(private val context: Context) {
 
         const val EXTRA_GROUP_ID = "extra_group_id"
         const val EXTRA_NOTIFICATION_ID = "extra_notification_id"
+
+        const val PRE_ALARM_ID_OFFSET = 100_000
+        const val FULLSCREEN_INTENT_OFFSET = 50_000
     }
 
     /**
@@ -117,7 +120,7 @@ class NotificationHelper(private val context: Context) {
         val notificationId = group.id.toInt()
 
         // Cancel any pending pre-alarm notification for this group
-        cancelNotification(notificationId + 100000)
+        cancelNotification(notificationId + PRE_ALARM_ID_OFFSET)
 
         val medListSummary = if (groupWithMeds.medications.isEmpty()) {
             "Sin medicamentos asignados"
@@ -236,6 +239,17 @@ class NotificationHelper(private val context: Context) {
 
     fun cancelNotification(notificationId: Int) {
         notificationManager.cancel(notificationId)
+    }
+
+    /**
+     * Cancels all notifications associated with a medication group:
+     * main alarm, pre-alarm, and optional interactive notification.
+     */
+    fun cancelAllForGroup(groupId: Long, additionalNotificationId: Int? = null) {
+        val baseId = groupId.toInt()
+        cancelNotification(baseId)
+        cancelNotification(baseId + PRE_ALARM_ID_OFFSET)
+        additionalNotificationId?.let { cancelNotification(it) }
     }
 
     private fun createActionPendingIntent(

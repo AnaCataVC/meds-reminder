@@ -3,9 +3,9 @@ package com.medsreminder.core.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.medsreminder.core.notification.NotificationHelper
-import com.medsreminder.data.local.dao.MedicationGroupDao
-import com.medsreminder.domain.scheduler.AlarmScheduler
+import com.medsreminder.domain.repository.MedicationScheduleRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -18,9 +18,12 @@ import java.time.LocalDate
  */
 class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
 
-    private val groupDao: MedicationGroupDao by inject()
-    private val alarmScheduler: AlarmScheduler by inject()
+    private val scheduleRepository: MedicationScheduleRepository by inject()
     private val notificationHelper: NotificationHelper by inject()
+
+    companion object {
+        private const val TAG = "NotificationActionReceiver"
+    }
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
@@ -32,52 +35,33 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val groupWithMeds = groupDao.getGroupById(groupId)
-                val group = groupWithMeds?.group ?: return@launch
                 val today = LocalDate.now()
 
                 when (action) {
                     NotificationHelper.ACTION_CONFIRM -> {
-                        // Mark today's dose as completed
-                        groupDao.markGroupAsTaken(groupId, today)
-                        notificationHelper.cancelNotification(notificationId)
-                        notificationHelper.cancelNotification(groupId.toInt())
-                        notificationHelper.cancelNotification(groupId.toInt() + 100000)
-                        // Schedule next regular alarm cycle with updated date
-                        val updatedGroup = group.copy(lastTakenDate = today, snoozeUntilEpochMs = null)
-                        alarmScheduler.schedule(updatedGroup)
+                        scheduleRepository.confirmIntake(groupId, today, notificationId)
                     }
 
                     NotificationHelper.ACTION_SNOOZE_10 -> {
-                        // Snooze alarm for 10 minutes
                         val snoozeTriggerEpoch = System.currentTimeMillis() + (10 * 60 * 1000L)
-                        groupDao.setSnoozeTime(groupId, snoozeTriggerEpoch)
-                        notificationHelper.cancelNotification(notificationId)
-                        alarmScheduler.scheduleSnooze(groupId, snoozeTriggerEpoch)
+                        scheduleRepository.snoozeSchedule(groupId, snoozeTriggerEpoch, notificationId)
                     }
 
                     NotificationHelper.ACTION_POSTPONE_6H -> {
-                        // Postpone alarm for 6 hours
                         val postponeTriggerEpoch = System.currentTimeMillis() + (6 * 3600 * 1000L)
-                        groupDao.setSnoozeTime(groupId, postponeTriggerEpoch)
-                        notificationHelper.cancelNotification(notificationId)
-                        alarmScheduler.scheduleSnooze(groupId, postponeTriggerEpoch)
+                        scheduleRepository.snoozeSchedule(groupId, postponeTriggerEpoch, notificationId)
                     }
 
                     NotificationHelper.ACTION_CANCEL_TODAY -> {
-                        // Skip dose for today without changing overall active state
-                        groupDao.markGroupSkippedToday(groupId, today)
-                        notificationHelper.cancelNotification(notificationId)
-                        // Also dismiss main notification if active
-                        notificationHelper.cancelNotification(groupId.toInt())
-                        alarmScheduler.schedule(group)
+                        scheduleRepository.skipSchedule(groupId, today, notificationId)
                     }
 
                     NotificationHelper.ACTION_DISMISS_PRE_ALARM -> {
-                        // Just dismiss the advance notification; exact alarm will still ring at scheduled time
                         notificationHelper.cancelNotification(notificationId)
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error handling notification action $action for groupId=$groupId", e)
             } finally {
                 pendingResult.finish()
             }

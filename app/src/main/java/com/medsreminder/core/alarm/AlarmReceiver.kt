@@ -3,6 +3,7 @@ package com.medsreminder.core.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
@@ -25,6 +26,7 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
     private val notificationHelper: NotificationHelper by inject()
 
     companion object {
+        private const val TAG = "AlarmReceiver"
         const val ACTION_FIRE_ALARM = "com.medsreminder.ACTION_FIRE_ALARM"
         const val ACTION_PRE_ALARM = "com.medsreminder.ACTION_PRE_ALARM"
         const val EXTRA_GROUP_ID = "extra_group_id"
@@ -60,8 +62,15 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
 
                     if (action == ACTION_FIRE_ALARM) {
                         notificationHelper.showMedicationNotification(groupWithMeds, personName)
-                        // Automatically schedule next occurrence for tomorrow / next active day
-                        alarmScheduler.schedule(groupWithMeds.group)
+
+                        // Fallback reschedule: if the user ignores the notification, ensure the next
+                        // regular calendar occurrence is queued. Any active future snooze takes precedence
+                        // and prevents clobbering.
+                        val freshGroup = groupDao.getGroupById(groupId)?.group ?: groupWithMeds.group
+                        val hasActiveSnooze = freshGroup.snoozeUntilEpochMs?.let { it > System.currentTimeMillis() } == true
+                        if (!hasActiveSnooze) {
+                            alarmScheduler.schedule(freshGroup)
+                        }
                     } else if (action == ACTION_PRE_ALARM) {
                         notificationHelper.showPreAlarmNotification(
                             groupWithMeds = groupWithMeds,
@@ -70,6 +79,8 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                         )
                     }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error executing AlarmReceiver for groupId=$groupId, action=$action", e)
             } finally {
                 pendingResult.finish()
             }

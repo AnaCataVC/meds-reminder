@@ -3,6 +3,7 @@ package com.medsreminder.core.alarm
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import com.medsreminder.domain.scheduler.AlarmScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -17,6 +18,10 @@ class BootReceiver : BroadcastReceiver(), KoinComponent {
 
     private val alarmScheduler: AlarmScheduler by inject()
 
+    companion object {
+        private const val TAG = "BootReceiver"
+    }
+
     override fun onReceive(context: Context, intent: Intent) {
         val validActions = listOf(
             Intent.ACTION_BOOT_COMPLETED,
@@ -30,6 +35,8 @@ class BootReceiver : BroadcastReceiver(), KoinComponent {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     alarmScheduler.rescheduleAllActive()
+                } catch (e: Exception) {
+                    Log.e(TAG, "Error rescheduling alarms on action=${intent.action}", e)
                 } finally {
                     pendingResult.finish()
                 }
