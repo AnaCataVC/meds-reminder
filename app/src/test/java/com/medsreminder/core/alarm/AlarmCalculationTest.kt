@@ -136,4 +136,47 @@ class AlarmCalculationTest {
 
         assertEquals(expectedEpoch, triggerEpoch)
     }
+
+    @Test
+    fun `calculateNextTriggerTime returns active snooze timestamp if snooze is in future`() {
+        val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 0)
+        val referenceNowMs = referenceNow.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val snoozeEpoch = referenceNowMs + (10 * 60 * 1000L) // Snoozed for +10 minutes
+
+        val group = MedicationGroupEntity(
+            id = 3,
+            personId = 1,
+            name = "Snoozed Medication",
+            scheduledTime = LocalTime.of(8, 0),
+            daysOfWeekMask = 127,
+            snoozeUntilEpochMs = snoozeEpoch
+        )
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        assertEquals(snoozeEpoch, triggerEpoch)
+    }
+
+    @Test
+    fun `calculateNextTriggerTime ignores past expired snooze and rolls over to tomorrow`() {
+        val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 15)
+        val referenceNowMs = referenceNow.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val expiredSnoozeEpoch = referenceNowMs - (5 * 60 * 1000L) // Expired 5 minutes ago
+
+        val group = MedicationGroupEntity(
+            id = 4,
+            personId = 1,
+            name = "Expired Snooze Medication",
+            scheduledTime = LocalTime.of(8, 0),
+            daysOfWeekMask = 127,
+            snoozeUntilEpochMs = expiredSnoozeEpoch
+        )
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val expectedTomorrowEpoch = LocalDateTime.of(2026, 8, 18, 8, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(expectedTomorrowEpoch, triggerEpoch)
+    }
 }

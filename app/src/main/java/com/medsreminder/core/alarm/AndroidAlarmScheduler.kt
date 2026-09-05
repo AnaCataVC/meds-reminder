@@ -32,8 +32,9 @@ class AndroidAlarmScheduler(
         val triggerEpochMs = calculateNextTriggerTime(group)
         setExactAlarmClock(group.id, triggerEpochMs)
 
-        // Schedule silent pre-alarm if enabled
-        if (group.advanceNoticeMinutes > 0) {
+        // Schedule silent pre-alarm if enabled and not currently snoozed
+        val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > System.currentTimeMillis()
+        if (!isSnoozed && group.advanceNoticeMinutes > 0) {
             val preTriggerEpochMs = triggerEpochMs - (group.advanceNoticeMinutes * 60 * 1000L)
             if (preTriggerEpochMs > System.currentTimeMillis()) {
                 setPreAlarm(group.id, preTriggerEpochMs)
@@ -123,11 +124,18 @@ class AndroidAlarmScheduler(
 
     /**
      * Calculates the next epoch millisecond timestamp for a given group schedule based on time and days mask.
+     * If an active future snooze is present in the entity, that snooze timestamp takes immediate precedence.
      */
     fun calculateNextTriggerTime(
         group: MedicationGroupEntity,
         referenceNow: LocalDateTime = LocalDateTime.now()
     ): Long {
+        val referenceNowEpochMs = referenceNow.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        val activeSnooze = group.snoozeUntilEpochMs
+        if (activeSnooze != null && activeSnooze > referenceNowEpochMs) {
+            return activeSnooze
+        }
+
         var targetDateTime = referenceNow.toLocalDate().atTime(group.scheduledTime)
 
         // If medication was already marked as taken today (or in the future for this cycle),
