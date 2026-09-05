@@ -47,7 +47,7 @@ interface MedicationGroupDao {
     @Query("UPDATE medication_groups SET snooze_until_epoch_ms = :snoozeEpoch WHERE id = :groupId")
     suspend fun setSnoozeTime(groupId: Long, snoozeEpoch: Long?)
 
-    @Query("UPDATE medication_groups SET last_taken_date = :date WHERE id = :groupId")
+    @Query("UPDATE medication_groups SET last_taken_date = :date, snooze_until_epoch_ms = NULL WHERE id = :groupId")
     suspend fun markGroupSkippedToday(groupId: Long, date: LocalDate)
 
     /**
