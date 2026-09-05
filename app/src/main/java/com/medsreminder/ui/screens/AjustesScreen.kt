@@ -148,7 +148,7 @@ fun AjustesScreen(
             ) {
                 Column(modifier = Modifier.padding(16.dp)) {
                     Text(
-                        text = "Meds Reminder v1.0.0",
+                        text = "Meds Reminder v${com.medsreminder.BuildConfig.VERSION_NAME}",
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )

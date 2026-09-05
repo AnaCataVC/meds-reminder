@@ -1,3 +1,21 @@
 <resources>
     <string name="app_name">Meds Reminder</string>
+
+    <!-- Navigation -->
+    <string name="nav_horarios">Horarios</string>
+    <string name="nav_medicamentos">Medicamentos</string>
+    <string name="nav_perfiles">Perfiles</string>
+    <string name="nav_ajustes">Ajustes</string>
+
+    <!-- Notification Actions -->
+    <string name="action_confirm_take">✅ Tomar ya</string>
+    <string name="action_snooze_10">⏳ +10 min</string>
+    <string name="action_postpone_6h">⏱️ +6 horas</string>
+    <string name="action_cancel_today">❌ Desactivar hoy</string>
+    <string name="action_dismiss">Silenciar</string>
+
+    <!-- General -->
+    <string name="user_default">Usuario</string>
+    <string name="notification_channel_name">Alarmas de Medicamentos</string>
+    <string name="pre_alarm_channel_name">Avisos Previos Silenciosos</string>
 </resources>
