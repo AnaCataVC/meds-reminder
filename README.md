@@ -10,7 +10,7 @@
 
 ---
 
-## 🇺🇸 English Version
+## English Version
 
 ### 1. Project Description
 **Meds Reminder** is a 100% offline-first, native Android application engineered for medication adherence and multi-profile dosage reminders. It allows users to manage multiple family members or profiles, create master medicine catalogs, configure schedule groups with exact alarm precision, choose custom device ringtones, suspend alarms per person (6h or rest of the day), receive silent pre-alarm notifications (15/30 min before), display full-screen popups over lock screens, and seamlessly back up or restore data in JSON format via Android's Storage Access Framework (SAF).
@@ -54,7 +54,7 @@ To ensure medication alarms ring reliably on Android:
 
 ---
 
-## 🇪🇸 Versión en Español
+## Versión en Español
 
 ### 1. Descripción del Proyecto
 **Meds Reminder** es una aplicación nativa de Android 100% local (sin nube) diseñada para la gestión y recordatorio puntual de medicamentos por persona. Permite administrar múltiples perfiles, mantener un catálogo maestro de fármacos reutilizables, agrupar tomas en horarios con alarmas de alta precisión, suspender temporalmente alarmas por persona (6h o resto del día), recibir avisos previos silenciosos (15/30 min antes), mostrar alarmas popup en pantalla completa sobre la pantalla bloqueada, personalizar tonos de alerta desde la biblioteca del dispositivo y realizar respaldos o restauraciones en formato JSON mediante el *Storage Access Framework (SAF)* de Android.
