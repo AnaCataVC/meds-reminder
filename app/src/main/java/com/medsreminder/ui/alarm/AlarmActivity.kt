@@ -30,20 +30,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.medsreminder.core.notification.NotificationHelper
-import com.medsreminder.data.local.dao.MedicationGroupDao
-import com.medsreminder.data.local.dao.PersonDao
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
 import com.medsreminder.data.local.entity.PersonEntity
-import com.medsreminder.domain.scheduler.AlarmScheduler
 import com.medsreminder.ui.theme.MedsReminderTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import org.koin.android.ext.android.inject
-import java.time.LocalDate
+import org.koin.androidx.viewmodel.ext.android.viewModel
 import java.time.format.DateTimeFormatter
 
 /**
@@ -51,10 +42,7 @@ import java.time.format.DateTimeFormatter
  */
 class AlarmActivity : ComponentActivity() {
 
-    private val groupDao: MedicationGroupDao by inject()
-    private val personDao: PersonDao by inject()
-    private val alarmScheduler: AlarmScheduler by inject()
-    private val notificationHelper: NotificationHelper by inject()
+    private val viewModel: AlarmViewModel by viewModel()
 
     companion object {
         const val EXTRA_GROUP_ID = "extra_group_id"
@@ -65,69 +53,30 @@ class AlarmActivity : ComponentActivity() {
         configureLockScreenDisplay()
 
         val groupId = intent.getLongExtra(EXTRA_GROUP_ID, -1L)
+        viewModel.loadAlarm(groupId)
 
         setContent {
             MedsReminderTheme {
-                var groupWithMeds by remember { mutableStateOf<MedicationGroupWithMedications?>(null) }
-                var person by remember { mutableStateOf<PersonEntity?>(null) }
-                var isLoading by remember { mutableStateOf(true) }
+                val uiState by viewModel.uiState.collectAsStateWithLifecycle()
 
-                LaunchedEffect(groupId) {
-                    if (groupId != -1L) {
-                        val group = withContext(Dispatchers.IO) { groupDao.getGroupById(groupId) }
-                        groupWithMeds = group
-                        if (group != null) {
-                            person = withContext(Dispatchers.IO) {
-                                personDao.getPersonById(group.group.personId).firstOrNull()
-                            }
-                        }
+                LaunchedEffect(uiState.isFinished) {
+                    if (uiState.isFinished) {
+                        finish()
                     }
-                    isLoading = false
                 }
 
-                if (isLoading) {
+                if (uiState.isLoading) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         CircularProgressIndicator()
                     }
-                } else if (groupWithMeds != null) {
+                } else if (uiState.groupWithMeds != null) {
                     AlarmPopupContent(
-                        groupWithMeds = groupWithMeds!!,
-                        person = person,
-                        onConfirmTaken = {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val today = LocalDate.now()
-                                groupDao.markGroupAsTaken(groupId, today)
-                                notificationHelper.cancelNotification(groupId.toInt())
-                                notificationHelper.cancelNotification(groupId.toInt() + 100000)
-                                val updatedGroup = groupWithMeds!!.group.copy(lastTakenDate = today, snoozeUntilEpochMs = null)
-                                alarmScheduler.schedule(updatedGroup)
-                                withContext(Dispatchers.Main) { finish() }
-                            }
-                        },
-                        onSnooze10Min = {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val snoozeEpoch = System.currentTimeMillis() + (10 * 60 * 1000L)
-                                groupDao.setSnoozeTime(groupId, snoozeEpoch)
-                                notificationHelper.cancelNotification(groupId.toInt())
-                                notificationHelper.cancelNotification(groupId.toInt() + 100000)
-                                alarmScheduler.scheduleSnooze(groupId, snoozeEpoch)
-                                withContext(Dispatchers.Main) { finish() }
-                            }
-                        },
-                        onCancelToday = {
-                            CoroutineScope(Dispatchers.IO).launch {
-                                val today = LocalDate.now()
-                                groupDao.markGroupSkippedToday(groupId, today)
-                                notificationHelper.cancelNotification(groupId.toInt())
-                                notificationHelper.cancelNotification(groupId.toInt() + 100000)
-                                val updatedGroup = groupWithMeds!!.group.copy(lastTakenDate = today, snoozeUntilEpochMs = null)
-                                alarmScheduler.schedule(updatedGroup)
-                                withContext(Dispatchers.Main) { finish() }
-                            }
-                        }
+                        groupWithMeds = uiState.groupWithMeds!!,
+                        person = uiState.person,
+                        onConfirmTaken = { viewModel.confirmTaken() },
+                        onSnooze10Min = { viewModel.snooze10Min() },
+                        onCancelToday = { viewModel.cancelToday() }
                     )
-                } else {
-                    LaunchedEffect(Unit) { finish() }
                 }
             }
         }

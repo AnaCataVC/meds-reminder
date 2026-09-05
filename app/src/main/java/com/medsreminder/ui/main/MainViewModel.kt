@@ -20,6 +20,8 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
+import com.medsreminder.domain.repository.MedicationScheduleRepository
+
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(
     private val context: Context,
@@ -28,12 +30,14 @@ class MainViewModel(
     private val groupDao: MedicationGroupDao,
     private val alarmScheduler: AndroidAlarmScheduler,
     private val notificationHelper: NotificationHelper,
-    private val backupManager: BackupManager
+    private val backupManager: BackupManager,
+    private val scheduleRepository: MedicationScheduleRepository
 ) : ViewModel() {
 
     private val _selectedPersonId = MutableStateFlow<Long?>(null)
     private val _medicationSearchQuery = MutableStateFlow("")
     private val _userMessage = MutableStateFlow<String?>(null)
+    private val _hasExactAlarmPermission = MutableStateFlow(checkExactAlarmPermissionInternal())
 
     private val _sideEffects = Channel<MainSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
@@ -46,7 +50,7 @@ class MainViewModel(
         }
     }
 
-    val uiState: StateFlow<MainUiState> = combine(
+    private val _dataFlow = combine(
         personDao.getAllPersons(),
         _selectedPersonId,
         _medicationsFlow,
@@ -54,7 +58,12 @@ class MainViewModel(
         _userMessage
     ) { persons, selectedId, meds, search, message ->
         Tuple5(persons, selectedId, meds, search, message)
-    }.flatMapLatest { (persons, selectedId, meds, search, message) ->
+    }
+
+    val uiState: StateFlow<MainUiState> = combine(
+        _dataFlow,
+        _hasExactAlarmPermission
+    ) { (persons, selectedId, meds, search, message), hasPermission ->
         val groupsFlow = if (selectedId == null) {
             groupDao.getAllGroupsWithMedications()
         } else {
@@ -69,11 +78,11 @@ class MainViewModel(
                 groupsWithMedications = groups,
                 catalogMedications = meds,
                 medicationSearchQuery = search,
-                hasExactAlarmPermission = checkExactAlarmPermission(),
+                hasExactAlarmPermission = hasPermission,
                 userMessage = message
             )
         }
-    }.stateIn(
+    }.flatMapLatest { it }.stateIn(
         scope = viewModelScope,
         started = SharingStarted.WhileSubscribed(5000),
         initialValue = MainUiState(isLoading = true)
@@ -241,17 +250,7 @@ class MainViewModel(
     private fun confirmIntakeToday(groupId: Long) {
         viewModelScope.launch {
             val today = LocalDate.now()
-            groupDao.markGroupAsTaken(groupId, today)
-            notificationHelper.cancelNotification(groupId.toInt())
-            notificationHelper.cancelNotification(groupId.toInt() + 100000)
-            val groupWithMeds = groupDao.getGroupById(groupId)
-            if (groupWithMeds != null) {
-                // Cancel existing pending alarm/snooze and reschedule next occurrence
-                alarmScheduler.cancel(groupWithMeds.group)
-                if (groupWithMeds.group.isActive) {
-                    alarmScheduler.schedule(groupWithMeds.group)
-                }
-            }
+            scheduleRepository.confirmIntake(groupId, today)
             _sideEffects.send(MainSideEffect.ShowSnackbar("¡Toma confirmada para hoy!"))
         }
     }
@@ -259,8 +258,7 @@ class MainViewModel(
     private fun snoozeGroup(groupId: Long, minutes: Int) {
         viewModelScope.launch {
             val triggerEpoch = System.currentTimeMillis() + (minutes * 60 * 1000L)
-            groupDao.setSnoozeTime(groupId, triggerEpoch)
-            alarmScheduler.scheduleSnooze(groupId, triggerEpoch)
+            scheduleRepository.snoozeSchedule(groupId, triggerEpoch)
             _sideEffects.send(MainSideEffect.ShowSnackbar("Pospuesto por $minutes minutos"))
         }
     }
@@ -304,6 +302,12 @@ class MainViewModel(
     }
 
     fun checkExactAlarmPermission(): Boolean {
+        val granted = checkExactAlarmPermissionInternal()
+        _hasExactAlarmPermission.value = granted
+        return granted
+    }
+
+    private fun checkExactAlarmPermissionInternal(): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
             alarmManager.canScheduleExactAlarms()
