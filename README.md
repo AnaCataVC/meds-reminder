@@ -1,6 +1,6 @@
 # 💊 Meds Reminder — Native Android Application
 
-[![Version](https://img.shields.io/badge/Version-1.2.0-emerald.svg?style=flat)](releases/)
+[![Version](https://img.shields.io/badge/Version-1.3.0-emerald.svg?style=flat)](releases/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
 [![Room](https://img.shields.io/badge/Room%20DB-2.6.1-3DDC84.svg?style=flat&logo=sqlite)](https://developer.android.com/training/data-storage/room)
