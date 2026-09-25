@@ -5,12 +5,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Build
+import android.util.Log
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.entity.MedicationGroupEntity
 import com.medsreminder.domain.scheduler.AlarmScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -64,14 +66,37 @@ class AndroidAlarmScheduler(
     override suspend fun rescheduleAllActive() = withContext(Dispatchers.IO) {
         val activeGroups = groupDao.getAllActiveGroupsSync()
         for (item in activeGroups) {
-            schedule(item.group)
+            // One failing group must not leave the remaining groups unscheduled.
+            runCatching { schedule(item.group) }
+                .onFailure { Log.e(TAG, "Failed to schedule groupId=${item.group.id}", it) }
+        }
+    }
+
+    override fun scheduleRingTimeout(groupId: Long, triggerAtEpochMs: Long) {
+        setExactOrInexact(triggerAtEpochMs, createRingTimeoutPendingIntent(groupId))
+    }
+
+    override fun cancelRingTimeout(groupId: Long) {
+        val pendingIntent = createRingTimeoutPendingIntent(groupId)
+        alarmManager.cancel(pendingIntent)
+        pendingIntent.cancel()
+    }
+
+    private fun canScheduleExact(): Boolean =
+        Build.VERSION.SDK_INT < Build.VERSION_CODES.S || alarmManager.canScheduleExactAlarms()
+
+    private fun setExactOrInexact(triggerEpochMs: Long, pendingIntent: PendingIntent) {
+        if (canScheduleExact()) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerEpochMs, pendingIntent)
+        } else {
+            alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerEpochMs, pendingIntent)
         }
     }
 
     private fun setExactAlarmClock(groupId: Long, triggerEpochMs: Long) {
         val pendingIntent = createPendingIntent(groupId)
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && !alarmManager.canScheduleExactAlarms()) {
+        if (!canScheduleExact()) {
             alarmManager.setAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerEpochMs, pendingIntent)
             return
         }
@@ -88,12 +113,20 @@ class AndroidAlarmScheduler(
     }
 
     private fun setPreAlarm(groupId: Long, preTriggerEpochMs: Long) {
-        val prePendingIntent = createPreAlarmPendingIntent(groupId)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, preTriggerEpochMs, prePendingIntent)
-        } else {
-            alarmManager.setExact(AlarmManager.RTC_WAKEUP, preTriggerEpochMs, prePendingIntent)
+        setExactOrInexact(preTriggerEpochMs, createPreAlarmPendingIntent(groupId))
+    }
+
+    private fun createRingTimeoutPendingIntent(groupId: Long): PendingIntent {
+        val intent = Intent(context, AlarmReceiver::class.java).apply {
+            action = AlarmReceiver.ACTION_RING_TIMEOUT
+            putExtra(AlarmReceiver.EXTRA_GROUP_ID, groupId)
         }
+        return PendingIntent.getBroadcast(
+            context,
+            (groupId + RING_TIMEOUT_REQUEST_OFFSET).toInt(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     private fun createPendingIntent(groupId: Long): PendingIntent {
@@ -153,8 +186,34 @@ class AndroidAlarmScheduler(
         return targetDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
     }
 
-    private fun isDayEnabled(dayOfWeek: DayOfWeek, mask: Int): Boolean {
-        val bit = 1 shl (dayOfWeek.value - 1)
-        return (mask and bit) != 0
+    companion object {
+        private const val TAG = "AndroidAlarmScheduler"
+        private const val RING_TIMEOUT_REQUEST_OFFSET = 200_000
+
+        /**
+         * Date of the dose that is due at [referenceNow]: the latest enabled occurrence of the
+         * group's time at or before [referenceNow]. A dose rung late (snoozed or postponed past
+         * midnight) still belongs to the day it was scheduled for, not to the day it was answered.
+         */
+        fun currentDoseDate(
+            group: MedicationGroupEntity,
+            referenceNow: LocalDateTime = LocalDateTime.now()
+        ): LocalDate {
+            var candidate = referenceNow.toLocalDate()
+            if (candidate.atTime(group.scheduledTime).isAfter(referenceNow)) {
+                candidate = candidate.minusDays(1)
+            }
+            while (!isDayEnabled(candidate.dayOfWeek, group.daysOfWeekMask)) {
+                candidate = candidate.minusDays(1)
+            }
+            return candidate
+        }
+
+        // An empty mask would never match any day; treat it as "every day" instead of looping forever.
+        private fun isDayEnabled(dayOfWeek: DayOfWeek, mask: Int): Boolean {
+            val effectiveMask = if (mask and 127 == 0) 127 else mask
+            val bit = 1 shl (dayOfWeek.value - 1)
+            return (effectiveMask and bit) != 0
+        }
     }
 }

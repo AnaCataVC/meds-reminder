@@ -21,7 +21,9 @@ data class PersonEntity(
     @ColumnInfo(name = "created_at_epoch_ms")
     val createdAtEpochMs: Long = System.currentTimeMillis(),
     @ColumnInfo(name = "suspended_until_epoch_ms")
-    val suspendedUntilEpochMs: Long? = null
+    val suspendedUntilEpochMs: Long? = null,
+    @ColumnInfo(name = "ringtone_uri")
+    val ringtoneUriString: String? = null // Default alarm sound; a group's own ringtone overrides it
 )
 
 /**

@@ -35,11 +35,13 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val today = LocalDate.now()
+                // Resolve against the dose the notification was for, not the day it was tapped.
+                val doseEpochDay = intent.getLongExtra(NotificationHelper.EXTRA_DOSE_EPOCH_DAY, Long.MIN_VALUE)
+                val doseDate = if (doseEpochDay == Long.MIN_VALUE) LocalDate.now() else LocalDate.ofEpochDay(doseEpochDay)
 
                 when (action) {
                     NotificationHelper.ACTION_CONFIRM -> {
-                        scheduleRepository.confirmIntake(groupId, today, notificationId)
+                        scheduleRepository.confirmIntake(groupId, doseDate, notificationId)
                     }
 
                     NotificationHelper.ACTION_SNOOZE_10 -> {
@@ -53,7 +55,7 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                     }
 
                     NotificationHelper.ACTION_CANCEL_TODAY -> {
-                        scheduleRepository.skipSchedule(groupId, today, notificationId)
+                        scheduleRepository.skipSchedule(groupId, doseDate, notificationId)
                     }
 
                     NotificationHelper.ACTION_DISMISS_PRE_ALARM -> {

@@ -22,10 +22,11 @@ import com.medsreminder.data.local.entity.PersonEntity
         MedicationGroupEntity::class,
         MedicationGroupCrossRef::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
     autoMigrations = [
-        androidx.room.AutoMigration(from = 1, to = 2)
+        androidx.room.AutoMigration(from = 1, to = 2),
+        androidx.room.AutoMigration(from = 2, to = 3)
     ]
 )
 @TypeConverters(RoomConverters::class)

@@ -2,10 +2,9 @@ package com.medsreminder.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.medsreminder.data.local.entity.PersonEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -21,8 +20,12 @@ interface PersonDao {
     @Query("UPDATE persons SET suspended_until_epoch_ms = :suspendedUntilEpochMs WHERE id = :personId")
     suspend fun setSuspendedUntil(personId: Long, suspendedUntilEpochMs: Long?)
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertPerson(person: PersonEntity): Long
+    @Query("SELECT * FROM persons WHERE id = :id")
+    suspend fun getPersonByIdSync(id: Long): PersonEntity?
+
+    // Upsert, not REPLACE: REPLACE deletes the row first, which CASCADE-deletes the person's groups.
+    @Upsert
+    suspend fun upsertPerson(person: PersonEntity): Long
 
     @Update
     suspend fun updatePerson(person: PersonEntity)

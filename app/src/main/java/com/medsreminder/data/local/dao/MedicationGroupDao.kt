@@ -26,8 +26,8 @@ interface MedicationGroupDao {
     @Query("SELECT * FROM medication_groups WHERE is_active = 1")
     suspend fun getAllActiveGroupsSync(): List<MedicationGroupWithMedications>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertGroup(group: MedicationGroupEntity): Long
+    @Upsert
+    suspend fun upsertGroup(group: MedicationGroupEntity): Long
 
     @Update
     suspend fun updateGroup(group: MedicationGroupEntity)
@@ -58,12 +58,9 @@ interface MedicationGroupDao {
         group: MedicationGroupEntity,
         medicationIds: List<Long>
     ): Long {
-        val groupId = if (group.id == 0L) {
-            insertGroup(group)
-        } else {
-            updateGroup(group)
-            group.id
-        }
+        // Upsert keeps restored ids (backup import) and never deletes the row, so cross-refs survive.
+        val upsertedId = upsertGroup(group)
+        val groupId = if (group.id == 0L) upsertedId else group.id
 
         deleteCrossRefsForGroup(groupId)
         if (medicationIds.isNotEmpty()) {

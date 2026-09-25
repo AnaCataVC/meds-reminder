@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -24,17 +25,19 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
     private val personDao: PersonDao by inject()
     private val alarmScheduler: AlarmScheduler by inject()
     private val notificationHelper: NotificationHelper by inject()
+    private val alarmSettings: AlarmSettings by inject()
 
     companion object {
         private const val TAG = "AlarmReceiver"
         const val ACTION_FIRE_ALARM = "com.medsreminder.ACTION_FIRE_ALARM"
         const val ACTION_PRE_ALARM = "com.medsreminder.ACTION_PRE_ALARM"
+        const val ACTION_RING_TIMEOUT = "com.medsreminder.ACTION_RING_TIMEOUT"
         const val EXTRA_GROUP_ID = "extra_group_id"
     }
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-        if (action != ACTION_FIRE_ALARM && action != ACTION_PRE_ALARM) return
+        if (action != ACTION_FIRE_ALARM && action != ACTION_PRE_ALARM && action != ACTION_RING_TIMEOUT) return
 
         val groupId = intent.getLongExtra(EXTRA_GROUP_ID, -1L)
         if (groupId == -1L) return
@@ -47,8 +50,15 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                     val person = personDao.getPersonById(groupWithMeds.group.personId).firstOrNull()
                     val personName = person?.name ?: "Usuario"
 
-                    val today = java.time.LocalDate.now()
-                    val isAlreadyTakenToday = groupWithMeds.group.lastTakenDate?.isEqual(today) == true
+                    val group = groupWithMeds.group
+                    val ringtoneUriString = group.ringtoneUriString ?: person?.ringtoneUriString
+                    // A pre-alarm announces the upcoming dose; the other actions refer to the dose already due.
+                    val doseDate = if (action == ACTION_PRE_ALARM) {
+                        LocalDateTime.now().plusMinutes(group.advanceNoticeMinutes.toLong()).toLocalDate()
+                    } else {
+                        AndroidAlarmScheduler.currentDoseDate(group)
+                    }
+                    val isAlreadyTakenToday = group.lastTakenDate?.let { !it.isBefore(doseDate) } == true
 
                     // Check if person's alarms are currently suspended
                     val isPersonSuspended = person?.suspendedUntilEpochMs?.let { it > System.currentTimeMillis() } ?: false
@@ -60,8 +70,21 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                         return@launch
                     }
 
-                    if (action == ACTION_FIRE_ALARM) {
-                        notificationHelper.showMedicationNotification(groupWithMeds, personName)
+                    if (action == ACTION_RING_TIMEOUT) {
+                        // Answered in the meantime (or dismissed): nothing left to silence.
+                        if (notificationHelper.isDoseNotificationActive(groupId)) {
+                            notificationHelper.showMedicationNotification(
+                                groupWithMeds, personName, ringtoneUriString, doseDate, silent = true
+                            )
+                        }
+                    } else if (action == ACTION_FIRE_ALARM) {
+                        notificationHelper.showMedicationNotification(groupWithMeds, personName, ringtoneUriString, doseDate)
+                        val timeoutMinutes = alarmSettings.ringTimeoutMinutes
+                        if (timeoutMinutes > 0) {
+                            alarmScheduler.scheduleRingTimeout(
+                                groupId, System.currentTimeMillis() + timeoutMinutes * 60_000L
+                            )
+                        }
 
                         // Fallback reschedule: if the user ignores the notification, ensure the next
                         // regular calendar occurrence is queued. Any active future snooze takes precedence
@@ -75,7 +98,8 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                         notificationHelper.showPreAlarmNotification(
                             groupWithMeds = groupWithMeds,
                             personName = personName,
-                            minutesBefore = groupWithMeds.group.advanceNoticeMinutes
+                            minutesBefore = groupWithMeds.group.advanceNoticeMinutes,
+                            doseDate = doseDate
                         )
                     }
                 }

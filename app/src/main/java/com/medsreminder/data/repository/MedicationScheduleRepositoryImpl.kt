@@ -20,6 +20,7 @@ class MedicationScheduleRepositoryImpl(
     override suspend fun confirmIntake(groupId: Long, date: LocalDate, notificationId: Int?) {
         groupDao.markGroupAsTaken(groupId, date)
         notificationHelper.cancelAllForGroup(groupId, notificationId)
+        alarmScheduler.cancelRingTimeout(groupId)
 
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
@@ -31,12 +32,14 @@ class MedicationScheduleRepositoryImpl(
     override suspend fun snoozeSchedule(groupId: Long, snoozeTriggerEpochMs: Long, notificationId: Int?) {
         groupDao.setSnoozeTime(groupId, snoozeTriggerEpochMs)
         notificationHelper.cancelAllForGroup(groupId, notificationId)
+        alarmScheduler.cancelRingTimeout(groupId)
         alarmScheduler.scheduleSnooze(groupId, snoozeTriggerEpochMs)
     }
 
     override suspend fun skipSchedule(groupId: Long, date: LocalDate, notificationId: Int?) {
         groupDao.markGroupSkippedToday(groupId, date)
         notificationHelper.cancelAllForGroup(groupId, notificationId)
+        alarmScheduler.cancelRingTimeout(groupId)
 
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {

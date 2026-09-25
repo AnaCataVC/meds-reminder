@@ -10,4 +10,6 @@ interface AlarmScheduler {
     fun scheduleSnooze(groupId: Long, triggerAtEpochMs: Long)
     fun cancel(group: MedicationGroupEntity)
     suspend fun rescheduleAllActive()
+    fun scheduleRingTimeout(groupId: Long, triggerAtEpochMs: Long)
+    fun cancelRingTimeout(groupId: Long)
 }

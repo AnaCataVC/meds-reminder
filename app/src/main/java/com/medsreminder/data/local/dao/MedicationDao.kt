@@ -2,10 +2,9 @@ package com.medsreminder.data.local.dao
 
 import androidx.room.Dao
 import androidx.room.Delete
-import androidx.room.Insert
-import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Update
+import androidx.room.Upsert
 import com.medsreminder.data.local.entity.MedicationEntity
 import kotlinx.coroutines.flow.Flow
 
@@ -21,11 +20,9 @@ interface MedicationDao {
     @Query("SELECT * FROM medications WHERE name LIKE '%' || :query || '%' ORDER BY name ASC")
     fun searchMedications(query: String): Flow<List<MedicationEntity>>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMedication(medication: MedicationEntity): Long
-
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertMedications(medications: List<MedicationEntity>): List<Long>
+    // Upsert, not REPLACE: REPLACE deletes the row first, which CASCADE-deletes its group cross-refs.
+    @Upsert
+    suspend fun upsertMedication(medication: MedicationEntity): Long
 
     @Update
     suspend fun updateMedication(medication: MedicationEntity)

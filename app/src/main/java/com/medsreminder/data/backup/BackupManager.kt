@@ -47,7 +47,14 @@ class BackupManager(
             val groupDao = database.medicationGroupDao()
 
             val persons = personDao.getAllPersons().first().map {
-                PersonDto(id = it.id, name = it.name, colorHex = it.colorHex)
+                PersonDto(
+                    id = it.id,
+                    name = it.name,
+                    colorHex = it.colorHex,
+                    ringtoneUriString = it.ringtoneUriString,
+                    createdAtEpochMs = it.createdAtEpochMs,
+                    suspendedUntilEpochMs = it.suspendedUntilEpochMs
+                )
             }
 
             val medications = medicationDao.getAllMedications().first().map {
@@ -111,18 +118,21 @@ class BackupManager(
 
                 // Insert Persons
                 for (pDto in envelope.payload.persons) {
-                    personDao.insertPerson(
+                    personDao.upsertPerson(
                         PersonEntity(
                             id = pDto.id,
                             name = pDto.name,
-                            colorHex = pDto.colorHex
+                            colorHex = pDto.colorHex,
+                            ringtoneUriString = pDto.ringtoneUriString,
+                            createdAtEpochMs = pDto.createdAtEpochMs ?: System.currentTimeMillis(),
+                            suspendedUntilEpochMs = pDto.suspendedUntilEpochMs
                         )
                     )
                 }
 
                 // Insert Medications
                 for (mDto in envelope.payload.medications) {
-                    medicationDao.insertMedication(
+                    medicationDao.upsertMedication(
                         MedicationEntity(
                             id = mDto.id,
                             name = mDto.name,

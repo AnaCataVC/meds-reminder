@@ -32,7 +32,13 @@ data class PersonDto(
     val id: Long,
     val name: String,
     @SerialName("color_hex")
-    val colorHex: String
+    val colorHex: String,
+    @SerialName("ringtone_uri")
+    val ringtoneUriString: String? = null,
+    @SerialName("created_at_epoch_ms")
+    val createdAtEpochMs: Long? = null,
+    @SerialName("suspended_until_epoch_ms")
+    val suspendedUntilEpochMs: Long? = null
 )
 
 @Serializable
