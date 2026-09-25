@@ -55,4 +55,18 @@ class BackupSerializationTest {
         assertEquals(1, decodedEnvelope.payload.medicationGroups.size)
         assertEquals(listOf(101L, 102L), decodedEnvelope.payload.medicationGroups[0].medicationIds)
     }
+
+    @Test
+    fun `decode backup without new person fields still succeeds`() {
+        val legacyJson = """
+            {"schema_version":1,"export_timestamp_epoch_ms":1,
+             "payload":{"persons":[{"id":1,"name":"Ana","color_hex":"#FF0000"}],
+                        "medications":[],"medication_groups":[]}}
+        """.trimIndent()
+
+        val decoded = Json { ignoreUnknownKeys = true }.decodeFromString<BackupEnvelope>(legacyJson)
+
+        assertEquals(null, decoded.payload.persons.single().ringtoneUriString)
+        assertEquals(null, decoded.payload.persons.single().suspendedUntilEpochMs)
+    }
 }

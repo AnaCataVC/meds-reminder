@@ -2,12 +2,15 @@ package com.medsreminder.ui.main
 
 import android.content.Context
 import app.cash.turbine.test
+import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.backup.BackupManager
 import com.medsreminder.data.local.dao.MedicationDao
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
+import com.medsreminder.data.local.entity.MedicationGroupEntity
+import com.medsreminder.data.local.entity.MedicationGroupWithMedications
 import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.domain.repository.MedicationScheduleRepository
 import io.mockk.coEvery
@@ -28,6 +31,7 @@ import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
+import java.time.LocalTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
@@ -42,6 +46,7 @@ class MainViewModelTest {
     private val mockNotificationHelper = mockk<NotificationHelper>(relaxed = true)
     private val mockBackupManager = mockk<BackupManager>(relaxed = true)
     private val mockScheduleRepository = mockk<MedicationScheduleRepository>(relaxed = true)
+    private val mockAlarmSettings = mockk<AlarmSettings>(relaxed = true)
 
     private lateinit var viewModel: MainViewModel
 
@@ -54,6 +59,7 @@ class MainViewModelTest {
         )
         every { mockMedicationDao.getAllMedications() } returns flowOf(emptyList())
         every { mockGroupDao.getAllGroupsWithMedications() } returns flowOf(emptyList())
+        every { mockGroupDao.getGroupsForPerson(any()) } returns flowOf(emptyList())
 
         viewModel = MainViewModel(
             context = mockContext,
@@ -63,7 +69,8 @@ class MainViewModelTest {
             alarmScheduler = mockAlarmScheduler,
             notificationHelper = mockNotificationHelper,
             backupManager = mockBackupManager,
-            scheduleRepository = mockScheduleRepository
+            scheduleRepository = mockScheduleRepository,
+            alarmSettings = mockAlarmSettings
         )
     }
 
@@ -113,8 +120,55 @@ class MainViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify {
-            mockPersonDao.insertPerson(match { it.name == "Carlos" && it.colorHex == "#00FF00" })
+            mockPersonDao.upsertPerson(match { it.name == "Carlos" && it.colorHex == "#00FF00" })
         }
+    }
+
+    @Test
+    fun `savePerson on edit keeps suspension and stores ringtone`() = runTest {
+        val stored = PersonEntity(id = 1, name = "Ana", colorHex = "#FF0000", suspendedUntilEpochMs = 123L)
+        coEvery { mockPersonDao.getPersonByIdSync(1L) } returns stored
+
+        viewModel.onIntent(
+            MainUiIntent.SavePerson(id = 1L, name = "Ana", colorHex = "#FF0000", ringtoneUriString = "content://tone")
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            mockPersonDao.upsertPerson(match { it.suspendedUntilEpochMs == 123L && it.ringtoneUriString == "content://tone" })
+        }
+    }
+
+    @Test
+    fun `saveGroup on edit keeps lastTakenDate`() = runTest {
+        val today = LocalDate.now()
+        val stored = MedicationGroupEntity(
+            id = 7, personId = 1, name = "Noche", scheduledTime = LocalTime.of(22, 0), lastTakenDate = today
+        )
+        coEvery { mockGroupDao.getGroupById(7L) } returns MedicationGroupWithMedications(stored, emptyList())
+        coEvery { mockGroupDao.saveGroupWithMedicationIds(any(), any()) } returns 7L
+
+        viewModel.onIntent(
+            MainUiIntent.SaveGroup(
+                groupId = 7, personId = 1, name = "Noche", scheduledTime = LocalTime.of(22, 30),
+                ringtoneUriString = null, daysOfWeekMask = 127, medicationIds = emptyList()
+            )
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { mockGroupDao.saveGroupWithMedicationIds(match { it.lastTakenDate == today }, any()) }
+    }
+
+    @Test
+    fun `deletePerson cancels alarms of its groups`() = runTest {
+        val group = MedicationGroupEntity(id = 7, personId = 1, name = "Noche", scheduledTime = LocalTime.of(22, 0))
+        every { mockGroupDao.getGroupsForPerson(1L) } returns flowOf(listOf(MedicationGroupWithMedications(group, emptyList())))
+
+        viewModel.onIntent(MainUiIntent.DeletePerson(PersonEntity(id = 1, name = "Ana", colorHex = "#FF0000")))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { mockAlarmScheduler.cancel(group) }
+        coVerify { mockNotificationHelper.cancelAllForGroup(7L) }
     }
 
     @Test

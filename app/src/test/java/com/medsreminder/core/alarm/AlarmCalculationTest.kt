@@ -6,6 +6,7 @@ import io.mockk.mockk
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
+import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
@@ -178,5 +179,40 @@ class AlarmCalculationTest {
             .toEpochMilli()
 
         assertEquals(expectedTomorrowEpoch, triggerEpoch)
+    }
+
+    @Test
+    fun `calculateNextTriggerTime treats empty days mask as every day instead of looping`() {
+        val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 0)
+        val group = MedicationGroupEntity(
+            id = 1, personId = 1, name = "No days", scheduledTime = LocalTime.of(9, 0), daysOfWeekMask = 0
+        )
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+
+        val expected = LocalDateTime.of(2026, 8, 17, 9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        assertEquals(expected, triggerEpoch)
+    }
+
+    @Test
+    fun `currentDoseDate keeps a dose answered after midnight on its scheduled day`() {
+        // 22:00 dose postponed and answered at 04:00 the next morning
+        val group = MedicationGroupEntity(id = 1, personId = 1, name = "Noche", scheduledTime = LocalTime.of(22, 0))
+
+        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, LocalDateTime.of(2026, 8, 18, 4, 0))
+
+        assertEquals(LocalDate.of(2026, 8, 17), doseDate)
+    }
+
+    @Test
+    fun `currentDoseDate skips back over disabled days`() {
+        // Monday-only dose (bit 1), asked on Wednesday
+        val group = MedicationGroupEntity(
+            id = 1, personId = 1, name = "Lunes", scheduledTime = LocalTime.of(8, 0), daysOfWeekMask = 1
+        )
+
+        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, LocalDateTime.of(2026, 8, 19, 10, 0))
+
+        assertEquals(LocalDate.of(2026, 8, 17), doseDate)
     }
 }
