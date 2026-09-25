@@ -2,6 +2,7 @@ package com.medsreminder.ui.alarm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
@@ -36,6 +37,7 @@ class AlarmViewModel(
     val uiState: StateFlow<AlarmUiState> = _uiState.asStateFlow()
 
     private var currentGroupId: Long = -1L
+    private var isResolving = false
 
     fun loadAlarm(groupId: Long) {
         if (groupId == -1L) {
@@ -57,28 +59,33 @@ class AlarmViewModel(
         }
     }
 
-    fun confirmTaken() {
-        if (currentGroupId == -1L) return
-        viewModelScope.launch {
-            scheduleRepository.confirmIntake(currentGroupId, LocalDate.now())
-            _uiState.update { it.copy(isFinished = true) }
-        }
+    fun confirmTaken() = resolve { groupId ->
+        scheduleRepository.confirmIntake(groupId, currentDoseDate())
     }
 
-    fun snooze10Min() {
-        if (currentGroupId == -1L) return
-        viewModelScope.launch {
-            val snoozeEpoch = System.currentTimeMillis() + (10 * 60 * 1000L)
-            scheduleRepository.snoozeSchedule(currentGroupId, snoozeEpoch)
-            _uiState.update { it.copy(isFinished = true) }
-        }
+    fun snooze10Min() = resolve { groupId ->
+        scheduleRepository.snoozeSchedule(groupId, System.currentTimeMillis() + (10 * 60 * 1000L))
     }
 
-    fun cancelToday() {
-        if (currentGroupId == -1L) return
+    fun cancelToday() = resolve { groupId ->
+        scheduleRepository.skipSchedule(groupId, currentDoseDate())
+    }
+
+    private fun currentDoseDate(): LocalDate =
+        _uiState.value.groupWithMeds?.group?.let { AndroidAlarmScheduler.currentDoseDate(it) } ?: LocalDate.now()
+
+    // Ignores further taps once one action is in flight, so a quick double tap can't run two transitions.
+    private fun resolve(action: suspend (groupId: Long) -> Unit) {
+        val groupId = currentGroupId
+        if (groupId == -1L || isResolving) return
+        isResolving = true
         viewModelScope.launch {
-            scheduleRepository.skipSchedule(currentGroupId, LocalDate.now())
-            _uiState.update { it.copy(isFinished = true) }
+            try {
+                action(groupId)
+                _uiState.update { it.copy(isFinished = true) }
+            } finally {
+                isResolving = false
+            }
         }
     }
 }

@@ -2,6 +2,7 @@ package com.medsreminder.ui.alarm
 
 import android.app.KeyguardManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Build
 import android.os.Bundle
@@ -80,6 +81,13 @@ class AlarmActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    // singleTask: a second alarm arriving while this screen is up must replace the shown group.
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        viewModel.loadAlarm(intent.getLongExtra(EXTRA_GROUP_ID, -1L))
     }
 
     private fun configureLockScreenDisplay() {

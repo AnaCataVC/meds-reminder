@@ -73,6 +73,6 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
-        viewModel.checkExactAlarmPermission()
+        viewModel.onAppResumed()
     }
 }

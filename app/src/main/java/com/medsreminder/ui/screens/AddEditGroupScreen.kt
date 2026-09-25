@@ -1,12 +1,5 @@
 package com.medsreminder.ui.screens
 
-import android.app.Activity
-import android.content.Intent
-import android.media.RingtoneManager
-import android.net.Uri
-import android.os.Build
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -36,6 +29,8 @@ import com.medsreminder.data.local.entity.MedicationEntity
 import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.ui.dialogs.AddEditMedicationSheet
 import com.medsreminder.ui.dialogs.AddEditPersonSheet
+import com.medsreminder.ui.components.rememberRingtonePicker
+import com.medsreminder.ui.components.ringtoneTitle
 import com.medsreminder.ui.main.MainUiIntent
 import com.medsreminder.ui.main.MainUiState
 import java.time.DayOfWeek
@@ -72,16 +67,8 @@ fun AddEditGroupScreen(
     var ringtoneUriString by remember(existingGroup) {
         mutableStateOf(existingGroup?.group?.ringtoneUriString)
     }
-    var ringtoneTitle by remember(ringtoneUriString) {
-        mutableStateOf(
-            if (ringtoneUriString.isNullOrBlank()) "Tono por defecto del sistema"
-            else {
-                runCatching {
-                    val ringtone = RingtoneManager.getRingtone(context, Uri.parse(ringtoneUriString))
-                    ringtone?.getTitle(context) ?: "Tono personalizado"
-                }.getOrDefault("Tono personalizado")
-            }
-        )
+    val ringtoneTitle = remember(ringtoneUriString) {
+        ringtoneTitle(context, ringtoneUriString, nullLabel = "Usar el sonido de la persona")
     }
     var daysOfWeekMask by remember(existingGroup) {
         mutableStateOf(existingGroup?.group?.daysOfWeekMask ?: 127)
@@ -105,33 +92,13 @@ fun AddEditGroupScreen(
         }
     }
 
-    // Ringtone Picker Intent Launcher
-    val ringtonePickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            val uri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI, Uri::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                result.data?.getParcelableExtra(RingtoneManager.EXTRA_RINGTONE_PICKED_URI)
-            }
-            ringtoneUriString = uri?.toString()
-            ringtoneTitle = if (uri != null) {
-                runCatching {
-                    RingtoneManager.getRingtone(context, uri)?.getTitle(context) ?: "Tono seleccionado"
-                }.getOrDefault("Tono seleccionado")
-            } else {
-                "Silencio / Sin sonido"
-            }
-        }
-    }
+    val launchRingtonePicker = rememberRingtonePicker { ringtoneUriString = it }
 
     if (showInlinePersonSheet) {
         AddEditPersonSheet(
             onDismiss = { showInlinePersonSheet = false },
-            onSave = { _, pName, colorHex ->
-                onIntent(MainUiIntent.SavePerson(name = pName, colorHex = colorHex))
+            onSave = { _, pName, colorHex, personRingtone ->
+                onIntent(MainUiIntent.SavePerson(name = pName, colorHex = colorHex, ringtoneUriString = personRingtone))
             }
         )
     }
@@ -443,18 +410,7 @@ fun AddEditGroupScreen(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clickable {
-                            val intent = Intent(RingtoneManager.ACTION_RINGTONE_PICKER).apply {
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_TYPE, RingtoneManager.TYPE_ALL)
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_DEFAULT, true)
-                                putExtra(RingtoneManager.EXTRA_RINGTONE_SHOW_SILENT, true)
-                                putExtra(
-                                    RingtoneManager.EXTRA_RINGTONE_EXISTING_URI,
-                                    ringtoneUriString?.let { Uri.parse(it) }
-                                )
-                            }
-                            ringtonePickerLauncher.launch(intent)
-                        },
+                        .clickable { launchRingtonePicker(ringtoneUriString) },
                     shape = RoundedCornerShape(14.dp),
                     colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
                 ) {
@@ -483,7 +439,7 @@ fun AddEditGroupScreen(
                                     fontWeight = FontWeight.SemiBold
                                 )
                                 Text(
-                                    text = "Toca para elegir desde la biblioteca del dispositivo",
+                                    text = "Toca para elegir un sonido solo para este horario",
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.outline
                                 )
@@ -494,6 +450,11 @@ fun AddEditGroupScreen(
                             contentDescription = null,
                             tint = MaterialTheme.colorScheme.outline
                         )
+                    }
+                }
+                if (ringtoneUriString != null) {
+                    TextButton(onClick = { ringtoneUriString = null }) {
+                        Text("Usar el sonido de la persona")
                     }
                 }
             }

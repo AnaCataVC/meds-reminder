@@ -11,6 +11,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,9 +19,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.medsreminder.data.local.entity.PersonEntity
+import com.medsreminder.ui.components.rememberRingtonePicker
+import com.medsreminder.ui.components.ringtoneTitle
 
 val PredefinedColors = listOf(
     "#0061A4", // Primary Blue
@@ -38,8 +42,14 @@ val PredefinedColors = listOf(
 fun AddEditPersonSheet(
     personToEdit: PersonEntity? = null,
     onDismiss: () -> Unit,
-    onSave: (id: Long, name: String, colorHex: String) -> Unit
+    onSave: (id: Long, name: String, colorHex: String, ringtoneUriString: String?) -> Unit
 ) {
+    val context = LocalContext.current
+    var ringtoneUriString by remember(personToEdit) { mutableStateOf(personToEdit?.ringtoneUriString) }
+    val ringtoneLabel = remember(ringtoneUriString) {
+        ringtoneTitle(context, ringtoneUriString, nullLabel = "Tono de alarma del sistema")
+    }
+    val launchRingtonePicker = rememberRingtonePicker { ringtoneUriString = it }
     var name by remember(personToEdit) { mutableStateOf(personToEdit?.name ?: "") }
     var selectedColor by remember(personToEdit) {
         mutableStateOf(personToEdit?.colorHex ?: PredefinedColors.first())
@@ -126,6 +136,29 @@ fun AddEditPersonSheet(
                 }
             }
 
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = "Sonido de alarma",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Spacer(modifier = Modifier.height(6.dp))
+            OutlinedButton(
+                onClick = { launchRingtonePicker(ringtoneUriString) },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Icon(Icons.Default.MusicNote, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text(ringtoneLabel, maxLines = 1)
+            }
+            Text(
+                text = "Se usa en todos sus horarios, salvo que un horario tenga su propio sonido.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+
             Spacer(modifier = Modifier.height(28.dp))
 
             Row(
@@ -142,7 +175,7 @@ fun AddEditPersonSheet(
                 Button(
                     onClick = {
                         if (name.isNotBlank()) {
-                            onSave(personToEdit?.id ?: 0L, name, selectedColor)
+                            onSave(personToEdit?.id ?: 0L, name, selectedColor, ringtoneUriString)
                             onDismiss()
                         }
                     },

@@ -45,8 +45,8 @@ fun HorariosScreen(
     if (showAddPersonSheet) {
         AddEditPersonSheet(
             onDismiss = { showAddPersonSheet = false },
-            onSave = { _, name, colorHex ->
-                onIntent(MainUiIntent.SavePerson(name = name, colorHex = colorHex))
+            onSave = { _, name, colorHex, ringtone ->
+                onIntent(MainUiIntent.SavePerson(name = name, colorHex = colorHex, ringtoneUriString = ringtone))
             }
         )
     }

@@ -43,8 +43,8 @@ fun PerfilesScreen(
                 showAddPersonSheet = false
                 personToEdit = null
             },
-            onSave = { id, name, colorHex ->
-                onIntent(MainUiIntent.SavePerson(id = id, name = name, colorHex = colorHex))
+            onSave = { id, name, colorHex, ringtone ->
+                onIntent(MainUiIntent.SavePerson(id = id, name = name, colorHex = colorHex, ringtoneUriString = ringtone))
             }
         )
     }

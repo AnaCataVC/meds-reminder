@@ -1,6 +1,7 @@
 package com.medsreminder.ui.screens
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -22,6 +23,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.ui.dialogs.BatteryOptimizationDialog
 import com.medsreminder.ui.main.MainUiIntent
 import com.medsreminder.ui.main.MainUiState
@@ -35,6 +37,7 @@ fun AjustesScreen(
 ) {
     val context = LocalContext.current
     var showBatteryDialog by remember { mutableStateOf(false) }
+    var showRingTimeoutDialog by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -50,6 +53,36 @@ fun AjustesScreen(
 
     if (showBatteryDialog) {
         BatteryOptimizationDialog(onDismiss = { showBatteryDialog = false })
+    }
+
+    if (showRingTimeoutDialog) {
+        AlertDialog(
+            onDismissRequest = { showRingTimeoutDialog = false },
+            title = { Text("Duración del sonido") },
+            text = {
+                Column {
+                    AlarmSettings.RING_TIMEOUT_OPTIONS.forEach { minutes ->
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onIntent(MainUiIntent.SetRingTimeout(minutes))
+                                    showRingTimeoutDialog = false
+                                }
+                                .padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            RadioButton(selected = state.ringTimeoutMinutes == minutes, onClick = null)
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(ringTimeoutLabel(minutes))
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showRingTimeoutDialog = false }) { Text("Cerrar") }
+            }
+        )
     }
 
     Scaffold(
@@ -88,6 +121,29 @@ fun AjustesScreen(
                         statusColor = if (state.hasExactAlarmPermission) Color(0xFF2E7D32) else Color(0xFFBA1A1A),
                         onClick = onRequestAlarmPermission
                     )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    SettingsRow(
+                        icon = Icons.Outlined.Timer,
+                        title = "Duración del sonido",
+                        subtitle = "${ringTimeoutLabel(state.ringTimeoutMinutes)}. Luego queda un aviso silencioso de dosis pendiente",
+                        onClick = { showRingTimeoutDialog = true }
+                    )
+                    if (!state.canUseFullScreenIntent && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                        SettingsRow(
+                            icon = Icons.Outlined.Fullscreen,
+                            title = "Alarma a pantalla completa",
+                            subtitle = "Desactivada: la alarma no aparecerá sobre la pantalla bloqueada (Toca para activar)",
+                            statusColor = Color(0xFFBA1A1A),
+                            onClick = {
+                                context.startActivity(
+                                    Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {
+                                        data = Uri.parse("package:${context.packageName}")
+                                    }
+                                )
+                            }
+                        )
+                    }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
                     SettingsRow(
                         icon = Icons.Outlined.BatteryAlert,
@@ -176,6 +232,9 @@ private fun SectionHeader(title: String) {
         modifier = Modifier.padding(top = 8.dp)
     )
 }
+
+private fun ringTimeoutLabel(minutes: Int): String =
+    if (minutes == 0) "Suena hasta que se responda" else "Suena $minutes min"
 
 @Composable
 private fun SettingsRow(

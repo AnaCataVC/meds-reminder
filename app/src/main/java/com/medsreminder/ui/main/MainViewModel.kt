@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.backup.BackupManager
@@ -31,13 +32,16 @@ class MainViewModel(
     private val alarmScheduler: AndroidAlarmScheduler,
     private val notificationHelper: NotificationHelper,
     private val backupManager: BackupManager,
-    private val scheduleRepository: MedicationScheduleRepository
+    private val scheduleRepository: MedicationScheduleRepository,
+    private val alarmSettings: AlarmSettings
 ) : ViewModel() {
 
     private val _selectedPersonId = MutableStateFlow<Long?>(null)
     private val _medicationSearchQuery = MutableStateFlow("")
     private val _userMessage = MutableStateFlow<String?>(null)
     private val _hasExactAlarmPermission = MutableStateFlow(checkExactAlarmPermissionInternal())
+    private val _canUseFullScreenIntent = MutableStateFlow(notificationHelper.canUseFullScreenIntent())
+    private val _ringTimeoutMinutes = MutableStateFlow(alarmSettings.ringTimeoutMinutes)
 
     private val _sideEffects = Channel<MainSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
@@ -62,8 +66,10 @@ class MainViewModel(
 
     val uiState: StateFlow<MainUiState> = combine(
         _dataFlow,
-        _hasExactAlarmPermission
-    ) { (persons, selectedId, meds, search, message), hasPermission ->
+        _hasExactAlarmPermission,
+        _canUseFullScreenIntent,
+        _ringTimeoutMinutes
+    ) { (persons, selectedId, meds, search, message), hasPermission, canUseFullScreen, ringTimeout ->
         val groupsFlow = if (selectedId == null) {
             groupDao.getAllGroupsWithMedications()
         } else {
@@ -79,6 +85,8 @@ class MainViewModel(
                 catalogMedications = meds,
                 medicationSearchQuery = search,
                 hasExactAlarmPermission = hasPermission,
+                canUseFullScreenIntent = canUseFullScreen,
+                ringTimeoutMinutes = ringTimeout,
                 userMessage = message
             )
         }
@@ -91,7 +99,7 @@ class MainViewModel(
     fun onIntent(intent: MainUiIntent) {
         when (intent) {
             is MainUiIntent.SelectPerson -> _selectedPersonId.value = intent.personId
-            is MainUiIntent.SavePerson -> savePerson(intent.id, intent.name, intent.colorHex)
+            is MainUiIntent.SavePerson -> savePerson(intent)
             is MainUiIntent.DeletePerson -> deletePerson(intent.person)
             is MainUiIntent.SuspendPerson -> suspendPerson(intent.personId, intent.hours, intent.untilEndOfDay)
             is MainUiIntent.ResumePerson -> resumePerson(intent.personId)
@@ -115,6 +123,10 @@ class MainViewModel(
             is MainUiIntent.ExportBackup -> exportBackup(intent.uri)
             is MainUiIntent.ImportBackup -> importBackup(intent.uri)
             is MainUiIntent.RefreshPermissions -> checkExactAlarmPermission()
+            is MainUiIntent.SetRingTimeout -> {
+                alarmSettings.ringTimeoutMinutes = intent.minutes
+                _ringTimeoutMinutes.value = intent.minutes
+            }
             is MainUiIntent.ClearMessage -> _userMessage.value = null
         }
     }
@@ -131,6 +143,12 @@ class MainViewModel(
             }
 
             personDao.setSuspendedUntil(personId, untilEpochMs)
+            // Queued alarms are skipped by AlarmReceiver while suspended; only what is
+            // already on screen needs dismissing.
+            forEachGroupOfPerson(personId) { group ->
+                notificationHelper.cancelAllForGroup(group.id)
+                alarmScheduler.cancelRingTimeout(group.id)
+            }
             val durationLabel = if (untilEndOfDay) "el resto del día" else "${hours}h"
             _sideEffects.send(MainSideEffect.ShowSnackbar("Alarmas pausadas por $durationLabel"))
         }
@@ -139,23 +157,39 @@ class MainViewModel(
     private fun resumePerson(personId: Long) {
         viewModelScope.launch {
             personDao.setSuspendedUntil(personId, null)
+            alarmScheduler.rescheduleAllActive()
             _sideEffects.send(MainSideEffect.ShowSnackbar("Alarmas reanudadas"))
         }
     }
 
-    private fun savePerson(id: Long, name: String, colorHex: String) {
+    private fun savePerson(intent: MainUiIntent.SavePerson) {
         viewModelScope.launch {
+            val name = intent.name.trim()
             if (name.isBlank()) {
                 _sideEffects.send(MainSideEffect.ShowSnackbar("El nombre no puede estar vacío"))
                 return@launch
             }
-            personDao.insertPerson(PersonEntity(id = id, name = name.trim(), colorHex = colorHex))
+            // Copy the stored row so an edit keeps fields the sheet doesn't show (suspension, creation date).
+            val existing = if (intent.id != 0L) personDao.getPersonByIdSync(intent.id) else null
+            val person = existing?.copy(name = name, colorHex = intent.colorHex, ringtoneUriString = intent.ringtoneUriString)
+                ?: PersonEntity(name = name, colorHex = intent.colorHex, ringtoneUriString = intent.ringtoneUriString)
+            personDao.upsertPerson(person)
             _sideEffects.send(MainSideEffect.ShowSnackbar("Perfil guardado: $name"))
         }
     }
 
+    private suspend fun forEachGroupOfPerson(personId: Long, action: (MedicationGroupEntity) -> Unit) {
+        groupDao.getGroupsForPerson(personId).first().forEach { action(it.group) }
+    }
+
     private fun deletePerson(person: PersonEntity) {
         viewModelScope.launch {
+            // CASCADE removes the groups from Room but not their system alarms and notifications.
+            forEachGroupOfPerson(person.id) { group ->
+                alarmScheduler.cancel(group)
+                alarmScheduler.cancelRingTimeout(group.id)
+                notificationHelper.cancelAllForGroup(group.id)
+            }
             personDao.deletePerson(person)
             if (_selectedPersonId.value == person.id) {
                 _selectedPersonId.value = null
@@ -172,7 +206,7 @@ class MainViewModel(
                 _sideEffects.send(MainSideEffect.ShowSnackbar("El nombre del medicamento es requerido"))
                 return@launch
             }
-            medicationDao.insertMedication(
+            medicationDao.upsertMedication(
                 MedicationEntity(
                     id = id,
                     name = name.trim(),
@@ -202,8 +236,9 @@ class MainViewModel(
                 return@launch
             }
 
-            val group = MedicationGroupEntity(
-                id = intent.groupId,
+            // Start from the stored row so an edit keeps today's taken/snooze state.
+            val existing = if (intent.groupId != 0L) groupDao.getGroupById(intent.groupId)?.group else null
+            val group = (existing ?: MedicationGroupEntity(personId = intent.personId, name = "", scheduledTime = intent.scheduledTime)).copy(
                 personId = intent.personId,
                 name = intent.name.trim(),
                 scheduledTime = intent.scheduledTime,
@@ -267,10 +302,12 @@ class MainViewModel(
         viewModelScope.launch {
             val groupWithMeds = groupDao.getGroupById(groupId)
             if (groupWithMeds != null) {
-                val person = personDao.getAllPersons().first().find { it.id == groupWithMeds.group.personId }
+                val person = personDao.getPersonByIdSync(groupWithMeds.group.personId)
                 notificationHelper.showMedicationNotification(
                     groupWithMeds = groupWithMeds,
-                    personName = person?.name ?: "Usuario"
+                    personName = person?.name ?: "Usuario",
+                    ringtoneUriString = groupWithMeds.group.ringtoneUriString ?: person?.ringtoneUriString,
+                    doseDate = LocalDate.now()
                 )
                 _sideEffects.send(MainSideEffect.ShowSnackbar("🔔 Alarma de prueba activada"))
             }
@@ -304,7 +341,14 @@ class MainViewModel(
     fun checkExactAlarmPermission(): Boolean {
         val granted = checkExactAlarmPermissionInternal()
         _hasExactAlarmPermission.value = granted
+        _canUseFullScreenIntent.value = notificationHelper.canUseFullScreenIntent()
         return granted
+    }
+
+    /** Re-queues every alarm; covers force-stops and permission changes that dropped them. */
+    fun onAppResumed() {
+        checkExactAlarmPermission()
+        viewModelScope.launch { alarmScheduler.rescheduleAllActive() }
     }
 
     private fun checkExactAlarmPermissionInternal(): Boolean {

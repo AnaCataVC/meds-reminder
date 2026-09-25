@@ -1,5 +1,6 @@
 package com.medsreminder.ui.main
 
+import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.data.local.entity.MedicationEntity
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
 import com.medsreminder.data.local.entity.PersonEntity
@@ -17,6 +18,8 @@ data class MainUiState(
     val medicationSearchQuery: String = "",
     val hasExactAlarmPermission: Boolean = true,
     val hasNotificationPermission: Boolean = true,
+    val canUseFullScreenIntent: Boolean = true,
+    val ringTimeoutMinutes: Int = AlarmSettings.DEFAULT_RING_TIMEOUT_MINUTES,
     val userMessage: String? = null
 )
 
@@ -26,7 +29,12 @@ data class MainUiState(
 sealed interface MainUiIntent {
     // Person Actions
     data class SelectPerson(val personId: Long?) : MainUiIntent
-    data class SavePerson(val id: Long = 0, val name: String, val colorHex: String) : MainUiIntent
+    data class SavePerson(
+        val id: Long = 0,
+        val name: String,
+        val colorHex: String,
+        val ringtoneUriString: String? = null
+    ) : MainUiIntent
     data class DeletePerson(val person: PersonEntity) : MainUiIntent
     data class SuspendPerson(val personId: Long, val hours: Int?, val untilEndOfDay: Boolean = false) : MainUiIntent
     data class ResumePerson(val personId: Long) : MainUiIntent
@@ -62,6 +70,7 @@ sealed interface MainUiIntent {
     data class ExportBackup(val uri: android.net.Uri) : MainUiIntent
     data class ImportBackup(val uri: android.net.Uri) : MainUiIntent
     data object RefreshPermissions : MainUiIntent
+    data class SetRingTimeout(val minutes: Int) : MainUiIntent
     data object ClearMessage : MainUiIntent
 }
 

@@ -1,6 +1,7 @@
 package com.medsreminder.di
 
 import androidx.room.Room
+import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.backup.BackupManager
@@ -31,6 +32,7 @@ val appModule = module {
 
     // Alarm & Notification Services
     single { NotificationHelper(androidContext()) }
+    single { AlarmSettings(androidContext()) }
     single { AndroidAlarmScheduler(androidContext(), get()) }
     single<AlarmScheduler> { get<AndroidAlarmScheduler>() }
 
@@ -56,7 +58,8 @@ val appModule = module {
             alarmScheduler = get(),
             notificationHelper = get(),
             backupManager = get(),
-            scheduleRepository = get()
+            scheduleRepository = get(),
+            alarmSettings = get()
         )
     }
 
