@@ -1,6 +1,6 @@
 # 💊 Meds Reminder — Native Android Application
 
-[![Version](https://img.shields.io/badge/Version-1.3.0-emerald.svg?style=flat)](releases/)
+[![Version](https://img.shields.io/badge/Version-1.4.0-emerald.svg?style=flat)](releases/)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.0.0-purple.svg?style=flat&logo=kotlin)](https://kotlinlang.org)
 [![Jetpack Compose](https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4.svg?style=flat&logo=android)](https://developer.android.com/jetpack/compose)
 [![Room](https://img.shields.io/badge/Room%20DB-2.6.1-3DDC84.svg?style=flat&logo=sqlite)](https://developer.android.com/training/data-storage/room)
@@ -14,7 +14,7 @@
 ## English Version
 
 ### 1. Project Description
-**Meds Reminder** is a 100% offline-first, native Android application engineered for high-reliability medication adherence and multi-profile dosage reminders. Built for families and caregivers, it enables users to manage multiple profiles, maintain a master medicine catalog, configure flexible schedule groups with deterministic alarm precision, assign custom device ringtones, temporarily suspend reminders per person (6 hours or remainder of the day), receive silent pre-alarm notifications (15/30 min before), display full-screen popups directly over lock screens, and atomically back up or restore data in JSON format via Android's Storage Access Framework (SAF).
+**Meds Reminder** is a 100% offline-first, native Android application engineered for high-reliability medication adherence and multi-profile dosage reminders. Built for families and caregivers, it enables users to manage multiple profiles, maintain a master medicine catalog, configure flexible schedule groups with deterministic alarm precision, assign custom device ringtones, temporarily suspend reminders per person (6 hours or remainder of the day), receive silent pre-alarm notifications (15/30 min before), configure rest cycles (e.g. contraceptives: 21 days on, 7 days off), display full-screen popups directly over lock screens, and atomically back up or restore data in JSON format via Android's Storage Access Framework (SAF).
 
 ### 2. Tech Stack & Architecture
 * **Language:** Kotlin (v2.0)
@@ -71,7 +71,7 @@ To ensure medication alarms ring reliably on Android:
 ## Versión en Español
 
 ### 1. Descripción del Proyecto
-**Meds Reminder** es una aplicación nativa de Android 100% local (offline-first), diseñada con estándares de alta confiabilidad para la adherencia a tratamientos médicos y recordatorios de dosis multi-perfil. Creada para familias y cuidadores, permite administrar múltiples perfiles, mantener un catálogo maestro de medicamentos, configurar horarios flexibles con alarmas de precisión determinista, asignar tonos personalizados del dispositivo, suspender temporalmente alarmas por persona (6 horas o el resto del día), recibir avisos previos silenciosos (15/30 min antes), mostrar ventanas emergentes interactivas sobre la pantalla de bloqueo y realizar respaldos o restauraciones atómicas en JSON mediante el *Storage Access Framework (SAF)* de Android.
+**Meds Reminder** es una aplicación nativa de Android 100% local (offline-first), diseñada con estándares de alta confiabilidad para la adherencia a tratamientos médicos y recordatorios de dosis multi-perfil. Creada para familias y cuidadores, permite administrar múltiples perfiles, mantener un catálogo maestro de medicamentos, configurar horarios flexibles con alarmas de precisión determinista, asignar tonos personalizados del dispositivo, suspender temporalmente alarmas por persona (6 horas o el resto del día), recibir avisos previos silenciosos (15/30 min antes), configurar ciclos de descanso (por ejemplo, anticonceptivos: 21 días de toma y 7 de descanso), mostrar ventanas emergentes interactivas sobre la pantalla de bloqueo y realizar respaldos o restauraciones atómicas en JSON mediante el *Storage Access Framework (SAF)* de Android.
 
 ### 2. Stack Tecnológico y Arquitectura
 * **Lenguaje:** Kotlin (v2.0)
