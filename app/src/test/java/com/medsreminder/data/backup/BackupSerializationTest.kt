@@ -6,6 +6,9 @@ import kotlinx.serialization.json.Json
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test
+import com.medsreminder.data.local.entity.MedicationGroupEntity
+import java.time.LocalDate
+import java.time.LocalTime
 
 class BackupSerializationTest {
 
@@ -68,5 +71,28 @@ class BackupSerializationTest {
 
         assertEquals(null, decoded.payload.persons.single().ringtoneUriString)
         assertEquals(null, decoded.payload.persons.single().suspendedUntilEpochMs)
+    }
+
+    @Test
+    fun `rest cycle survives a backup round trip`() {
+        val group = MedicationGroupEntity(
+            id = 7, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(21, 0),
+            cycleActiveDays = 21, cycleRestDays = 7, cycleStartDate = LocalDate.of(2026, 9, 1)
+        )
+
+        val encoded = json.encodeToString(group.toBackupDto(emptyList()))
+        val restored = json.decodeFromString<MedicationGroupDto>(encoded).toEntity()
+
+        assertEquals(group, restored)
+    }
+
+    @Test
+    fun `decode backup without cycle fields restores a group without cycle`() {
+        val legacyGroup = """{"id":1,"person_id":1,"name":"X","scheduled_time":"08:00","medication_ids":[]}"""
+
+        val restored = Json { ignoreUnknownKeys = true }.decodeFromString<MedicationGroupDto>(legacyGroup).toEntity()
+
+        assertEquals(0, restored.cycleActiveDays)
+        assertEquals(null, restored.cycleStartDate)
     }
 }

@@ -215,4 +215,30 @@ class AlarmCalculationTest {
 
         assertEquals(LocalDate.of(2026, 8, 17), doseDate)
     }
+
+    @Test
+    fun `calculateNextTriggerTime skips the rest phase of a cycle`() {
+        // 21 on / 7 off starting Monday 2026-08-03: day 21 (2026-08-24) is the first rest day
+        val group = MedicationGroupEntity(
+            id = 1, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(9, 0),
+            cycleActiveDays = 21, cycleRestDays = 7, cycleStartDate = LocalDate.of(2026, 8, 3)
+        )
+
+        val trigger = scheduler.calculateNextTriggerTime(group, LocalDateTime.of(2026, 8, 23, 10, 0))
+
+        val expected = LocalDateTime.of(2026, 8, 31, 9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+        assertEquals(expected, trigger)
+    }
+
+    @Test
+    fun `currentDoseDate skips back over rest days`() {
+        val group = MedicationGroupEntity(
+            id = 1, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(9, 0),
+            cycleActiveDays = 21, cycleRestDays = 7, cycleStartDate = LocalDate.of(2026, 8, 3)
+        )
+
+        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, LocalDateTime.of(2026, 8, 27, 10, 0))
+
+        assertEquals(LocalDate.of(2026, 8, 23), doseDate)
+    }
 }

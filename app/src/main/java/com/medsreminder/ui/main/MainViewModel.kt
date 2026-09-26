@@ -245,7 +245,10 @@ class MainViewModel(
                 ringtoneUriString = intent.ringtoneUriString,
                 daysOfWeekMask = intent.daysOfWeekMask,
                 isActive = true,
-                advanceNoticeMinutes = intent.advanceNoticeMinutes
+                advanceNoticeMinutes = intent.advanceNoticeMinutes,
+                cycleActiveDays = intent.cycleActiveDays,
+                cycleRestDays = intent.cycleRestDays,
+                cycleStartDate = intent.cycleStartDate
             )
 
             val savedId = groupDao.saveGroupWithMedicationIds(group, intent.medicationIds)

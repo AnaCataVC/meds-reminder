@@ -24,6 +24,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
 import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.ui.dialogs.AddEditPersonSheet
@@ -322,6 +323,7 @@ private fun HorarioReminderCard(
     val group = groupWithMeds.group
     val today = remember { LocalDate.now() }
     val isTakenToday = group.lastTakenDate == today
+    val isRestDay = !AndroidAlarmScheduler.isInActivePhase(group, today)
 
     val personColor = remember(person?.colorHex) {
         runCatching { Color(AndroidColor.parseColor(person?.colorHex ?: "#0061A4")) }
@@ -413,11 +415,23 @@ private fun HorarioReminderCard(
 
                     Surface(
                         shape = RoundedCornerShape(8.dp),
-                        color = if (isTakenToday) Color(0xFFE8F5E9) else Color(0xFFFFF3E0)
+                        color = when {
+                            isTakenToday -> Color(0xFFE8F5E9)
+                            isRestDay -> MaterialTheme.colorScheme.surfaceVariant
+                            else -> Color(0xFFFFF3E0)
+                        }
                     ) {
                         Text(
-                            text = if (isTakenToday) "✓ Tomado hoy" else "Pendiente",
-                            color = if (isTakenToday) Color(0xFF2E7D32) else Color(0xFFE65100),
+                            text = when {
+                                isTakenToday -> "✓ Tomado hoy"
+                                isRestDay -> "En descanso"
+                                else -> "Pendiente"
+                            },
+                            color = when {
+                                isTakenToday -> Color(0xFF2E7D32)
+                                isRestDay -> MaterialTheme.colorScheme.onSurfaceVariant
+                                else -> Color(0xFFE65100)
+                            },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

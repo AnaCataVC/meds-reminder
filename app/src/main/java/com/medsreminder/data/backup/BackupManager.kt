@@ -20,6 +20,7 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.time.LocalDate
 import java.time.LocalTime
 
 /**
@@ -67,17 +68,7 @@ class BackupManager(
             }
 
             val groups = groupDao.getAllGroupsWithMedications().first().map { item ->
-                MedicationGroupDto(
-                    id = item.group.id,
-                    personId = item.group.personId,
-                    name = item.group.name,
-                    scheduledTime = item.group.scheduledTime.toString(),
-                    ringtoneUriString = item.group.ringtoneUriString,
-                    isActive = item.group.isActive,
-                    daysOfWeekMask = item.group.daysOfWeekMask,
-                    advanceNoticeMinutes = item.group.advanceNoticeMinutes,
-                    medicationIds = item.medications.map { it.id }
-                )
+                item.group.toBackupDto(item.medications.map { it.id })
             }
 
             val envelope = BackupEnvelope(
@@ -145,16 +136,7 @@ class BackupManager(
                 // Insert Groups and cross references
                 for (gDto in envelope.payload.medicationGroups) {
                     groupDao.saveGroupWithMedicationIds(
-                        group = MedicationGroupEntity(
-                            id = gDto.id,
-                            personId = gDto.personId,
-                            name = gDto.name,
-                            scheduledTime = LocalTime.parse(gDto.scheduledTime),
-                            ringtoneUriString = gDto.ringtoneUriString,
-                            isActive = gDto.isActive,
-                            daysOfWeekMask = gDto.daysOfWeekMask,
-                            advanceNoticeMinutes = gDto.advanceNoticeMinutes
-                        ),
+                        group = gDto.toEntity(),
                         medicationIds = gDto.medicationIds
                     )
                 }
@@ -165,3 +147,32 @@ class BackupManager(
         }
     }
 }
+
+internal fun MedicationGroupEntity.toBackupDto(medicationIds: List<Long>) = MedicationGroupDto(
+    id = id,
+    personId = personId,
+    name = name,
+    scheduledTime = scheduledTime.toString(),
+    ringtoneUriString = ringtoneUriString,
+    isActive = isActive,
+    daysOfWeekMask = daysOfWeekMask,
+    advanceNoticeMinutes = advanceNoticeMinutes,
+    cycleActiveDays = cycleActiveDays,
+    cycleRestDays = cycleRestDays,
+    cycleStartDate = cycleStartDate?.toString(),
+    medicationIds = medicationIds
+)
+
+internal fun MedicationGroupDto.toEntity() = MedicationGroupEntity(
+    id = id,
+    personId = personId,
+    name = name,
+    scheduledTime = LocalTime.parse(scheduledTime),
+    ringtoneUriString = ringtoneUriString,
+    isActive = isActive,
+    daysOfWeekMask = daysOfWeekMask,
+    advanceNoticeMinutes = advanceNoticeMinutes,
+    cycleActiveDays = cycleActiveDays,
+    cycleRestDays = cycleRestDays,
+    cycleStartDate = cycleStartDate?.let(LocalDate::parse)
+)

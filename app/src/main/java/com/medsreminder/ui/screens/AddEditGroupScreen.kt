@@ -23,6 +23,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medsreminder.data.local.entity.MedicationEntity
@@ -34,7 +36,10 @@ import com.medsreminder.ui.components.ringtoneTitle
 import com.medsreminder.ui.main.MainUiIntent
 import com.medsreminder.ui.main.MainUiState
 import java.time.DayOfWeek
+import java.time.Instant
+import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
@@ -76,6 +81,19 @@ fun AddEditGroupScreen(
     var advanceNoticeMinutes by remember(existingGroup) {
         mutableStateOf(existingGroup?.group?.advanceNoticeMinutes ?: 15)
     }
+    var cycleEnabled by remember(existingGroup) {
+        mutableStateOf((existingGroup?.group?.cycleActiveDays ?: 0) > 0)
+    }
+    var cycleActiveDaysText by remember(existingGroup) {
+        mutableStateOf(existingGroup?.group?.cycleActiveDays?.takeIf { it > 0 }?.toString() ?: "21")
+    }
+    var cycleRestDaysText by remember(existingGroup) {
+        mutableStateOf(existingGroup?.group?.cycleRestDays?.takeIf { it > 0 }?.toString() ?: "7")
+    }
+    var cycleStartDate by remember(existingGroup) {
+        mutableStateOf(existingGroup?.group?.cycleStartDate ?: LocalDate.now())
+    }
+    var showCycleDatePicker by remember { mutableStateOf(false) }
     var selectedMedicationIds by remember(existingGroup) {
         mutableStateOf(existingGroup?.medications?.map { it.id }?.toSet() ?: emptySet())
     }
@@ -549,12 +567,78 @@ fun AddEditGroupScreen(
                 }
             }
 
+            // 8. Ciclo de descanso
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "8. Ciclo de descanso",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = "Toma durante unos días y descansa otros (por ejemplo, anticonceptivos 21/7).",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.outline
+                        )
+                    }
+                    Switch(checked = cycleEnabled, onCheckedChange = { cycleEnabled = it })
+                }
+                if (cycleEnabled) {
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = cycleActiveDaysText,
+                            onValueChange = { cycleActiveDaysText = it.filter(Char::isDigit).take(3) },
+                            label = { Text("Días de toma") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = cycleRestDaysText,
+                            onValueChange = { cycleRestDaysText = it.filter(Char::isDigit).take(3) },
+                            label = { Text("Días de descanso") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedButton(onClick = { showCycleDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Inicio del ciclo: ${cycleStartDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}")
+                    }
+                }
+            }
+
+            if (showCycleDatePicker) {
+                val datePickerState = rememberDatePickerState(
+                    initialSelectedDateMillis = cycleStartDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+                )
+                DatePickerDialog(
+                    onDismissRequest = { showCycleDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            // DatePicker reports the selected day as UTC midnight.
+                            datePickerState.selectedDateMillis?.let {
+                                cycleStartDate = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
+                            }
+                            showCycleDatePicker = false
+                        }) { Text("Aceptar") }
+                    },
+                    dismissButton = { TextButton(onClick = { showCycleDatePicker = false }) { Text("Cancelar") } }
+                ) { DatePicker(state = datePickerState) }
+            }
+
             Spacer(modifier = Modifier.height(10.dp))
 
             // Save Button
             val isNameMissing = name.isBlank()
             val isPersonMissing = selectedPersonId == 0L
-            val canSave = !isNameMissing && !isPersonMissing
+            val cycleActiveDays = cycleActiveDaysText.toIntOrNull() ?: 0
+            val cycleRestDays = cycleRestDaysText.toIntOrNull() ?: 0
+            val isCycleInvalid = cycleEnabled && (cycleActiveDays <= 0 || cycleRestDays <= 0)
+            val canSave = !isNameMissing && !isPersonMissing && !isCycleInvalid
 
             Button(
                 onClick = {
@@ -567,7 +651,10 @@ fun AddEditGroupScreen(
                             ringtoneUriString = ringtoneUriString,
                             daysOfWeekMask = if (daysOfWeekMask == 0) 127 else daysOfWeekMask,
                             medicationIds = selectedMedicationIds.toList(),
-                            advanceNoticeMinutes = advanceNoticeMinutes
+                            advanceNoticeMinutes = advanceNoticeMinutes,
+                            cycleActiveDays = if (cycleEnabled) cycleActiveDays else 0,
+                            cycleRestDays = if (cycleEnabled) cycleRestDays else 0,
+                            cycleStartDate = if (cycleEnabled) cycleStartDate else null
                         )
                     )
                 },

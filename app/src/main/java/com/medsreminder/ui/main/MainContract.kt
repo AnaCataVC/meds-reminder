@@ -4,6 +4,7 @@ import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.data.local.entity.MedicationEntity
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
 import com.medsreminder.data.local.entity.PersonEntity
+import java.time.LocalDate
 import java.time.LocalTime
 
 /**
@@ -61,7 +62,10 @@ sealed interface MainUiIntent {
         val ringtoneUriString: String?,
         val daysOfWeekMask: Int,
         val medicationIds: List<Long>,
-        val advanceNoticeMinutes: Int = 15
+        val advanceNoticeMinutes: Int = 15,
+        val cycleActiveDays: Int = 0,
+        val cycleRestDays: Int = 0,
+        val cycleStartDate: LocalDate? = null
     ) : MainUiIntent
     data class DeleteGroup(val groupId: Long) : MainUiIntent
     data class TestAlarm(val groupId: Long) : MainUiIntent

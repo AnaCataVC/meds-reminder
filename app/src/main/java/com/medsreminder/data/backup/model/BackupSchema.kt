@@ -65,6 +65,12 @@ data class MedicationGroupDto(
     val daysOfWeekMask: Int = 127,
     @SerialName("advance_notice_minutes")
     val advanceNoticeMinutes: Int = 15,
+    @SerialName("cycle_active_days")
+    val cycleActiveDays: Int = 0,
+    @SerialName("cycle_rest_days")
+    val cycleRestDays: Int = 0,
+    @SerialName("cycle_start_date")
+    val cycleStartDate: String? = null, // ISO yyyy-MM-dd
     @SerialName("medication_ids")
     val medicationIds: List<Long>
 )

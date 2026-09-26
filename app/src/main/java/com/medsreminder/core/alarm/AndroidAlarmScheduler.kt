@@ -15,6 +15,7 @@ import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 
 /**
  * Android implementation of AlarmScheduler utilizing AlarmManager.setAlarmClock() for highest reliability.
@@ -179,7 +180,7 @@ class AndroidAlarmScheduler(
         }
 
         // Loop forward until we find an enabled day of the week
-        while (!isDayEnabled(targetDateTime.dayOfWeek, group.daysOfWeekMask)) {
+        while (!isDayEnabled(group, targetDateTime.toLocalDate())) {
             targetDateTime = targetDateTime.plusDays(1)
         }
 
@@ -203,14 +204,27 @@ class AndroidAlarmScheduler(
             if (candidate.atTime(group.scheduledTime).isAfter(referenceNow)) {
                 candidate = candidate.minusDays(1)
             }
-            while (!isDayEnabled(candidate.dayOfWeek, group.daysOfWeekMask)) {
+            while (!isDayEnabled(group, candidate)) {
                 candidate = candidate.minusDays(1)
             }
             return candidate
         }
 
+        /** A dose is due on [date] when its weekday is enabled and it falls in the active phase of the rest cycle. */
+        fun isDayEnabled(group: MedicationGroupEntity, date: LocalDate): Boolean =
+            isWeekdayEnabled(date.dayOfWeek, group.daysOfWeekMask) && isInActivePhase(group, date)
+
+        // An incomplete cycle config counts as "no cycle", so a bad row can never block every day.
+        fun isInActivePhase(group: MedicationGroupEntity, date: LocalDate): Boolean {
+            val start = group.cycleStartDate ?: return true
+            if (group.cycleActiveDays <= 0 || group.cycleRestDays <= 0) return true
+            val cycleLength = group.cycleActiveDays + group.cycleRestDays
+            val dayInCycle = Math.floorMod(ChronoUnit.DAYS.between(start, date), cycleLength.toLong())
+            return dayInCycle < group.cycleActiveDays
+        }
+
         // An empty mask would never match any day; treat it as "every day" instead of looping forever.
-        private fun isDayEnabled(dayOfWeek: DayOfWeek, mask: Int): Boolean {
+        private fun isWeekdayEnabled(dayOfWeek: DayOfWeek, mask: Int): Boolean {
             val effectiveMask = if (mask and 127 == 0) 127 else mask
             val bit = 1 shl (dayOfWeek.value - 1)
             return (effectiveMask and bit) != 0

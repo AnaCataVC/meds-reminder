@@ -77,7 +77,14 @@ data class MedicationGroupEntity(
     @ColumnInfo(name = "snooze_until_epoch_ms")
     val snoozeUntilEpochMs: Long? = null,
     @ColumnInfo(name = "advance_notice_minutes", defaultValue = "15")
-    val advanceNoticeMinutes: Int = 15 // 0 = disabled, 15 = 15m before, 30 = 30m before
+    val advanceNoticeMinutes: Int = 15, // 0 = disabled, 15 = 15m before, 30 = 30m before
+    // Rest cycle (e.g. contraceptives: 21 on / 7 off). 0 active days = no cycle.
+    @ColumnInfo(name = "cycle_active_days", defaultValue = "0")
+    val cycleActiveDays: Int = 0,
+    @ColumnInfo(name = "cycle_rest_days", defaultValue = "0")
+    val cycleRestDays: Int = 0,
+    @ColumnInfo(name = "cycle_start_date")
+    val cycleStartDate: LocalDate? = null
 )
 
 /**
