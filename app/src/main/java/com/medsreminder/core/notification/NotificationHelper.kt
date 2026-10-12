@@ -7,9 +7,14 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.media.AudioAttributes
+import android.media.AudioFocusRequest
+import android.media.AudioManager
 import android.media.RingtoneManager
 import android.net.Uri
 import android.os.Build
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.medsreminder.MainActivity
 import com.medsreminder.R
@@ -26,6 +31,7 @@ class NotificationHelper(private val context: Context) {
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
     companion object {
+        private const val TAG = "NotificationHelper"
         const val DEFAULT_CHANNEL_ID = "meds_reminder_alarm_channel_v2"
         const val PRE_ALARM_CHANNEL_ID = "meds_pre_alarm_silent_channel"
 
@@ -259,14 +265,66 @@ class NotificationHelper(private val context: Context) {
     }
 
     /**
+     * Immediately silences ongoing alarm audio and terminates vibration.
+     * Requests and abandons exclusive audio focus on USAGE_ALARM to evict the system NotificationPlayer,
+     * cycles stream mute for hardware-level termination, and cancels active vibrators.
+     */
+    fun silenceAlarmAudio() {
+        try {
+            val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+            if (audioManager != null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val alarmAttributes = AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_ALARM)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                        .build()
+                    val focusRequest = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
+                        .setAudioAttributes(alarmAttributes)
+                        .build()
+                    audioManager.requestAudioFocus(focusRequest)
+                    audioManager.abandonAudioFocusRequest(focusRequest)
+                } else {
+                    @Suppress("DEPRECATION")
+                    audioManager.requestAudioFocus(null, AudioManager.STREAM_ALARM, AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                    @Suppress("DEPRECATION")
+                    audioManager.abandonAudioFocus(null)
+                }
+
+                // Transient stream mute cycle as secondary hardware failsafe across custom OEM roms
+                runCatching {
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_MUTE, 0)
+                    audioManager.adjustStreamVolume(AudioManager.STREAM_ALARM, AudioManager.ADJUST_UNMUTE, 0)
+                }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to silence alarm audio stream", e)
+        }
+
+        try {
+            val vibrator = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                vibratorManager?.defaultVibrator
+            } else {
+                @Suppress("DEPRECATION")
+                context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+            }
+            vibrator?.cancel()
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to cancel vibration", e)
+        }
+    }
+
+    /**
      * Cancels all notifications associated with a medication group:
      * main alarm, pre-alarm, and optional interactive notification.
+     * Also immediately silences any active ringing audio stream.
      */
     fun cancelAllForGroup(groupId: Long, additionalNotificationId: Int? = null) {
         val baseId = groupId.toInt()
         cancelNotification(baseId)
         cancelNotification(baseId + PRE_ALARM_ID_OFFSET)
         additionalNotificationId?.let { cancelNotification(it) }
+        silenceAlarmAudio()
     }
 
     private fun createActionPendingIntent(

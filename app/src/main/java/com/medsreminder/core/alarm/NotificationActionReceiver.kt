@@ -32,6 +32,13 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
 
         if (groupId == -1L) return
 
+        // Immediately dismiss and silence audio on broadcast arrival before background dispatch
+        if (action != NotificationHelper.ACTION_DISMISS_PRE_ALARM) {
+            notificationHelper.cancelAllForGroup(groupId, notificationId)
+        } else {
+            notificationHelper.cancelNotification(notificationId)
+        }
+
         val pendingResult = goAsync()
         CoroutineScope(Dispatchers.IO).launch {
             try {

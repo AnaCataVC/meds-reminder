@@ -67,7 +67,8 @@ val appModule = module {
         AlarmViewModel(
             groupDao = get(),
             personDao = get(),
-            scheduleRepository = get()
+            scheduleRepository = get(),
+            notificationHelper = get()
         )
     }
 }

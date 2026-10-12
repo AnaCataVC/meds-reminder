@@ -3,6 +3,7 @@ package com.medsreminder.ui.alarm
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.medsreminder.core.alarm.AndroidAlarmScheduler
+import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
@@ -30,7 +31,8 @@ data class AlarmUiState(
 class AlarmViewModel(
     private val groupDao: MedicationGroupDao,
     private val personDao: PersonDao,
-    private val scheduleRepository: MedicationScheduleRepository
+    private val scheduleRepository: MedicationScheduleRepository,
+    private val notificationHelper: NotificationHelper
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AlarmUiState())
@@ -79,6 +81,10 @@ class AlarmViewModel(
         val groupId = currentGroupId
         if (groupId == -1L || isResolving) return
         isResolving = true
+
+        // Cut ringing audio and dismiss ongoing notifications synchronously on main thread
+        notificationHelper.cancelAllForGroup(groupId)
+
         viewModelScope.launch {
             try {
                 action(groupId)
