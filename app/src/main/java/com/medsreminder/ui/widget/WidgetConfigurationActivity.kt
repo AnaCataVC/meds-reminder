@@ -2,6 +2,7 @@ package com.medsreminder.ui.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.Context
 import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Bundle
@@ -82,23 +83,40 @@ class WidgetConfigurationActivity : ComponentActivity() {
     private fun saveConfigurationAndExit(selectedPersonId: Long?) {
         lifecycleScope.launch {
             try {
+                // 1. Dual-store: Immediately save to SharedPreferences keyed by appWidgetId (atomic & synchronous)
+                val sp = applicationContext.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
+                sp.edit().putLong("widget_person_$appWidgetId", selectedPersonId ?: -1L).apply()
+
+                // 2. Identify target AppWidget provider
+                val appWidgetInfo = AppWidgetManager.getInstance(applicationContext).getAppWidgetInfo(appWidgetId)
+                val providerClassName = appWidgetInfo?.provider?.className ?: ""
+
+                // 3. Update Glance internal state
                 val glanceManager = GlanceAppWidgetManager(applicationContext)
-                val glanceId = glanceManager.getGlanceIdBy(appWidgetId)
+                val glanceId = runCatching { glanceManager.getGlanceIdBy(appWidgetId) }.getOrNull()
 
-                updateAppWidgetState(applicationContext, glanceId) { prefs ->
-                    prefs[WidgetConstants.PREF_SELECTED_PERSON_ID] = selectedPersonId ?: -1L
+                if (glanceId != null) {
+                    runCatching {
+                        updateAppWidgetState(applicationContext, glanceId) { prefs ->
+                            prefs[WidgetConstants.PREF_SELECTED_PERSON_ID] = selectedPersonId ?: -1L
+                        }
+                    }
+
+                    // 4. Update the exact matching widget class safely without cross-class collision
+                    if (providerClassName.contains("NextDose")) {
+                        runCatching { NextDoseWidget().update(applicationContext, glanceId) }
+                    } else if (providerClassName.contains("DailySchedule")) {
+                        runCatching { DailyScheduleWidget().update(applicationContext, glanceId) }
+                    } else {
+                        runCatching { NextDoseWidget().update(applicationContext, glanceId) }
+                        runCatching { DailyScheduleWidget().update(applicationContext, glanceId) }
+                    }
                 }
-
-                NextDoseWidget().update(applicationContext, glanceId)
-                DailyScheduleWidget().update(applicationContext, glanceId)
-
-                val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
-                setResult(Activity.RESULT_OK, resultValue)
             } catch (e: Exception) {
                 Log.e("WidgetConfig", "Failed to update widget state for appWidgetId=$appWidgetId", e)
+            } finally {
                 val resultValue = Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, appWidgetId)
                 setResult(Activity.RESULT_OK, resultValue)
-            } finally {
                 finish()
             }
         }

@@ -1,5 +1,6 @@
 package com.medsreminder.ui.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.graphics.Color as AndroidColor
 import androidx.compose.runtime.Composable
@@ -13,6 +14,7 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
@@ -56,7 +58,19 @@ class DailyScheduleWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val prefs = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
-        val selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
+        var selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
+
+        // Fallback: Infallible lookup from SharedPreferences keyed by platform appWidgetId
+        if (selectedPersonId == null) {
+            val appWidgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
+            if (appWidgetId != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                val sp = context.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
+                val spPersonId = sp.getLong("widget_person_$appWidgetId", -1L)
+                if (spPersonId > 0) {
+                    selectedPersonId = spPersonId
+                }
+            }
+        }
 
         val koin = runCatching { GlobalContext.get() }.getOrNull()
         val groupDao: MedicationGroupDao? = koin?.getOrNull()
@@ -95,7 +109,7 @@ class DailyScheduleWidget : GlanceAppWidget() {
                 .fillMaxSize()
                 .background(GlanceTheme.colors.surface)
                 .cornerRadius(16.dp)
-                .padding(14.dp)
+                .padding(16.dp)
         ) {
             Column(
                 modifier = GlanceModifier.fillMaxSize()
@@ -107,11 +121,25 @@ class DailyScheduleWidget : GlanceAppWidget() {
                         .clickable(actionStartActivity<MainActivity>()),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
+                    if (configuredPerson != null) {
+                        val personColor = runCatching {
+                            Color(AndroidColor.parseColor(configuredPerson.colorHex))
+                        }.getOrDefault(Color(0xFF0061A4))
+
+                        Box(
+                            modifier = GlanceModifier
+                                .size(10.dp)
+                                .background(personColor)
+                                .cornerRadius(5.dp)
+                        ) {}
+                        Spacer(modifier = GlanceModifier.width(8.dp))
+                    }
+
                     val title = configuredPerson?.let { "Tomas de ${it.name}" } ?: "Tomas de Hoy"
                     Text(
                         text = title,
                         style = TextStyle(
-                            fontSize = 14.sp,
+                            fontSize = 15.sp,
                             fontWeight = FontWeight.Bold,
                             color = GlanceTheme.colors.onSurface
                         ),
@@ -122,7 +150,7 @@ class DailyScheduleWidget : GlanceAppWidget() {
                         Text(
                             text = "$completedCount/$totalCount",
                             style = TextStyle(
-                                fontSize = 12.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = GlanceTheme.colors.primary
                             )
@@ -130,7 +158,7 @@ class DailyScheduleWidget : GlanceAppWidget() {
                     }
                 }
 
-                Spacer(modifier = GlanceModifier.height(8.dp))
+                Spacer(modifier = GlanceModifier.height(10.dp))
 
                 if (items.isEmpty()) {
                     Box(
@@ -140,7 +168,11 @@ class DailyScheduleWidget : GlanceAppWidget() {
                         contentAlignment = Alignment.Center
                     ) {
                         Text(
-                            text = "Sin horarios programados para hoy",
+                            text = if (configuredPerson != null) {
+                                "Sin horarios para ${configuredPerson.name} hoy"
+                            } else {
+                                "Sin horarios programados para hoy"
+                            },
                             style = TextStyle(
                                 fontSize = 13.sp,
                                 color = GlanceTheme.colors.onSurfaceVariant
@@ -153,7 +185,7 @@ class DailyScheduleWidget : GlanceAppWidget() {
                     ) {
                         items(items) { item ->
                             ScheduleItemRow(item = item, showPersonBadge = configuredPerson == null)
-                            Spacer(modifier = GlanceModifier.height(6.dp))
+                            Spacer(modifier = GlanceModifier.height(8.dp))
                         }
                     }
                 }
@@ -173,8 +205,8 @@ class DailyScheduleWidget : GlanceAppWidget() {
             modifier = GlanceModifier
                 .fillMaxWidth()
                 .background(GlanceTheme.colors.surfaceVariant)
-                .cornerRadius(10.dp)
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .cornerRadius(12.dp)
+                .padding(horizontal = 14.dp, vertical = 10.dp)
         ) {
             Row(
                 modifier = GlanceModifier.fillMaxWidth(),
@@ -187,31 +219,34 @@ class DailyScheduleWidget : GlanceAppWidget() {
 
                     Box(
                         modifier = GlanceModifier
-                            .size(8.dp)
+                            .size(10.dp)
                             .background(badgeColor)
-                            .cornerRadius(4.dp)
+                            .cornerRadius(5.dp)
                     ) {}
-                    Spacer(modifier = GlanceModifier.width(6.dp))
+                    Spacer(modifier = GlanceModifier.width(8.dp))
                 }
 
                 Column(
                     modifier = GlanceModifier.defaultWeight()
                 ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
+                    Row(
+                        modifier = GlanceModifier.fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
                             text = timeFormatted,
                             style = TextStyle(
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.primary,
                                 textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None
                             )
                         )
-                        Spacer(modifier = GlanceModifier.width(6.dp))
+                        Spacer(modifier = GlanceModifier.width(8.dp))
                         Text(
                             text = item.groupName,
                             style = TextStyle(
-                                fontSize = 13.sp,
+                                fontSize = 14.sp,
                                 fontWeight = FontWeight.Medium,
                                 color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface
                             ),
@@ -220,10 +255,11 @@ class DailyScheduleWidget : GlanceAppWidget() {
                     }
 
                     if (item.medications.isNotEmpty()) {
+                        Spacer(modifier = GlanceModifier.height(2.dp))
                         Text(
                             text = item.medications.joinToString(", "),
                             style = TextStyle(
-                                fontSize = 11.sp,
+                                fontSize = 12.sp,
                                 color = GlanceTheme.colors.onSurfaceVariant
                             ),
                             maxLines = 1
@@ -231,13 +267,13 @@ class DailyScheduleWidget : GlanceAppWidget() {
                     }
                 }
 
-                Spacer(modifier = GlanceModifier.width(8.dp))
+                Spacer(modifier = GlanceModifier.width(10.dp))
 
                 if (isDone) {
                     Text(
                         text = "✓ Listo",
                         style = TextStyle(
-                            fontSize = 12.sp,
+                            fontSize = 13.sp,
                             fontWeight = FontWeight.Bold,
                             color = GlanceTheme.colors.primary
                         )

@@ -1,5 +1,6 @@
 package com.medsreminder.ui.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.graphics.Color as AndroidColor
 import androidx.compose.runtime.Composable
@@ -13,6 +14,7 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
+import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
@@ -54,7 +56,18 @@ class NextDoseWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val prefs = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
-        val selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
+        var selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
+
+        if (selectedPersonId == null) {
+            val appWidgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
+            if (appWidgetId != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                val sp = context.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
+                val spPersonId = sp.getLong("widget_person_$appWidgetId", -1L)
+                if (spPersonId > 0) {
+                    selectedPersonId = spPersonId
+                }
+            }
+        }
 
         // Fetch data from Room using Koin
         val koin = runCatching { GlobalContext.get() }.getOrNull()
