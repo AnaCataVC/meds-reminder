@@ -66,6 +66,41 @@
             </intent-filter>
         </receiver>
 
+        <!-- AppWidget Configuration Activity -->
+        <activity
+            android:name=".ui.widget.WidgetConfigurationActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <!-- Next Dose Glance AppWidget Receiver -->
+        <receiver
+            android:name=".ui.widget.receiver.NextDoseWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_next_dose_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/next_dose_widget_info" />
+        </receiver>
+
+        <!-- Daily Schedule Glance AppWidget Receiver -->
+        <receiver
+            android:name=".ui.widget.receiver.DailyScheduleWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_daily_schedule_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/daily_schedule_widget_info" />
+        </receiver>
     </application>
 
 </manifest>

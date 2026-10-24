@@ -18,4 +18,10 @@
     <string name="user_default">Usuario</string>
     <string name="notification_channel_name">Alarmas de Medicamentos</string>
     <string name="pre_alarm_channel_name">Avisos Previos Silenciosos</string>
+
+    <!-- Widgets -->
+    <string name="widget_next_dose_title">Próxima Toma</string>
+    <string name="widget_next_dose_description">Muestra la siguiente toma programada con botones de acción rápida.</string>
+    <string name="widget_daily_schedule_title">Agenda de Medicamentos</string>
+    <string name="widget_daily_schedule_description">Lista completa con todas las tomas programadas para el día de hoy.</string>
 </resources>

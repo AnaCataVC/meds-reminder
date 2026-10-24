@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.medsreminder.core.notification.NotificationHelper
+import com.medsreminder.core.widget.WidgetUpdater
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
 import com.medsreminder.domain.scheduler.AlarmScheduler
@@ -26,6 +27,7 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
     private val alarmScheduler: AlarmScheduler by inject()
     private val notificationHelper: NotificationHelper by inject()
     private val alarmSettings: AlarmSettings by inject()
+    private val widgetUpdater: WidgetUpdater by inject()
 
     companion object {
         private const val TAG = "AlarmReceiver"
@@ -103,6 +105,7 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                         )
                     }
                 }
+                runCatching { widgetUpdater.notifyWidgetsChanged() }
             } catch (e: Exception) {
                 Log.e(TAG, "Error executing AlarmReceiver for groupId=$groupId, action=$action", e)
             } finally {

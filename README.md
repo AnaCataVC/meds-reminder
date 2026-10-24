@@ -21,6 +21,7 @@
 ### 2. Tech Stack & Architecture
 * **Language:** Kotlin (v2.0)
 * **UI Toolkit:** Jetpack Compose with Material Design 3
+* **AppWidgets:** Jetpack Glance (v1.1.1) with Material 3, interactive 1-tap dosage actions (`ActionCallback`), and per-instance profile configuration
 * **Architecture:** Clean Architecture + MVI/MVVM with reactive `StateFlow`
 * **Single Source of Truth (SSOT):** Room Database with Kotlin Symbol Processing (KSP) & Auto-Migrations
 * **Domain Repository:** `MedicationScheduleRepository` orchestrating state transitions across Room, `AlarmManager`, and `NotificationManager`

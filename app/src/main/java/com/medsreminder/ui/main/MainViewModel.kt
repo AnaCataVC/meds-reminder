@@ -22,6 +22,7 @@ import kotlinx.coroutines.launch
 import java.time.LocalDate
 
 import com.medsreminder.domain.repository.MedicationScheduleRepository
+import com.medsreminder.core.widget.WidgetUpdater
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModel(
@@ -33,7 +34,8 @@ class MainViewModel(
     private val notificationHelper: NotificationHelper,
     private val backupManager: BackupManager,
     private val scheduleRepository: MedicationScheduleRepository,
-    private val alarmSettings: AlarmSettings
+    private val alarmSettings: AlarmSettings,
+    private val widgetUpdater: WidgetUpdater? = null
 ) : ViewModel() {
 
     private val _selectedPersonId = MutableStateFlow<Long?>(null)
@@ -151,6 +153,7 @@ class MainViewModel(
             }
             val durationLabel = if (untilEndOfDay) "el resto del día" else "${hours}h"
             _sideEffects.send(MainSideEffect.ShowSnackbar("Alarmas pausadas por $durationLabel"))
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
@@ -159,6 +162,7 @@ class MainViewModel(
             personDao.setSuspendedUntil(personId, null)
             alarmScheduler.rescheduleAllActive()
             _sideEffects.send(MainSideEffect.ShowSnackbar("Alarmas reanudadas"))
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
@@ -175,6 +179,7 @@ class MainViewModel(
                 ?: PersonEntity(name = name, colorHex = intent.colorHex, ringtoneUriString = intent.ringtoneUriString)
             personDao.upsertPerson(person)
             _sideEffects.send(MainSideEffect.ShowSnackbar("Perfil guardado: $name"))
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
@@ -197,6 +202,7 @@ class MainViewModel(
             // Reschedule remaining alarms
             alarmScheduler.rescheduleAllActive()
             _sideEffects.send(MainSideEffect.ShowSnackbar("Perfil eliminado: ${person.name}"))
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
@@ -257,6 +263,7 @@ class MainViewModel(
 
             _sideEffects.send(MainSideEffect.ShowSnackbar("Horario programado: ${group.name}"))
             _sideEffects.send(MainSideEffect.NavigateBack)
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
@@ -267,6 +274,7 @@ class MainViewModel(
             groupDao.deleteGroup(groupWithMeds.group)
             _sideEffects.send(MainSideEffect.ShowSnackbar("Horario eliminado"))
             _sideEffects.send(MainSideEffect.NavigateBack)
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
@@ -282,6 +290,7 @@ class MainViewModel(
                 alarmScheduler.cancel(updated)
                 _sideEffects.send(MainSideEffect.ShowSnackbar("Alarma pausada"))
             }
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 

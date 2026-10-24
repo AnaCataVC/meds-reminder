@@ -6,6 +6,8 @@ import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.backup.BackupManager
 import com.medsreminder.data.local.AppDatabase
+import com.medsreminder.core.widget.AndroidWidgetUpdater
+import com.medsreminder.core.widget.WidgetUpdater
 import com.medsreminder.domain.scheduler.AlarmScheduler
 import com.medsreminder.data.repository.MedicationScheduleRepositoryImpl
 import com.medsreminder.domain.repository.MedicationScheduleRepository
@@ -36,9 +38,13 @@ val appModule = module {
     single { AndroidAlarmScheduler(androidContext(), get()) }
     single<AlarmScheduler> { get<AndroidAlarmScheduler>() }
 
+    // AppWidget Updater
+    single<WidgetUpdater> { AndroidWidgetUpdater(androidContext()) }
+
     // Schedule Domain Repository
     single<MedicationScheduleRepository> {
         MedicationScheduleRepositoryImpl(
+            widgetUpdater = get(),
             groupDao = get(),
             alarmScheduler = get(),
             notificationHelper = get()
@@ -51,6 +57,7 @@ val appModule = module {
     // ViewModels
     viewModel {
         MainViewModel(
+            widgetUpdater = get(),
             context = androidContext(),
             personDao = get(),
             medicationDao = get(),

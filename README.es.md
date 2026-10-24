@@ -22,6 +22,7 @@
 ### 2. Stack Tecnológico y Arquitectura
 * **Lenguaje:** Kotlin (v2.0)
 * **Interfaz de Usuario:** Jetpack Compose con Material Design 3
+* **Widgets para Inicio:** Jetpack Glance (v1.1.1) con Material 3, acciones interactivas de 1 toque (`ActionCallback`) y configuración de perfil por instancia
 * **Arquitectura:** Clean Architecture + MVI/MVVM con `StateFlow` reactivo
 * **Fuente Única de Verdad (SSOT):** Room Database con Kotlin Symbol Processing (KSP) y Auto-Migraciones
 * **Repositorio de Dominio:** `MedicationScheduleRepository` orquestando transiciones de estado atómicas entre Room, `AlarmManager` y `NotificationManager`
