@@ -1,6 +1,8 @@
 package com.medsreminder.ui.widget.action
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.glance.GlanceId
@@ -13,8 +15,6 @@ import com.medsreminder.domain.repository.MedicationScheduleRepository
 import com.medsreminder.ui.widget.DailyScheduleWidget
 import com.medsreminder.ui.widget.NextDoseWidget
 import com.medsreminder.ui.widget.WidgetConstants
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -42,9 +42,9 @@ class ConfirmIntakeActionCallback : ActionCallback, KoinComponent {
             val groupWithMeds = groupDao.getGroupById(groupId)
             val groupName = groupWithMeds?.group?.name ?: "Medicamento"
 
-            // Instant visual Toast feedback
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "✅ Toma confirmada: $groupName", Toast.LENGTH_SHORT).show()
+            // Instant visual Toast feedback posted safely to main looper
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context.applicationContext, "✅ Toma confirmada: $groupName", Toast.LENGTH_SHORT).show()
             }
 
             // Dismiss active notifications & audio

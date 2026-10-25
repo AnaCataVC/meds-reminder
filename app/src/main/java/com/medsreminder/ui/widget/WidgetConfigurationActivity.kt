@@ -26,12 +26,15 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.glance.GlanceId
 import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.lifecycle.lifecycleScope
+import com.medsreminder.core.widget.WidgetUpdater
 import com.medsreminder.data.local.dao.PersonDao
 import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.ui.theme.MedsReminderTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
@@ -42,6 +45,7 @@ import org.koin.android.ext.android.inject
 class WidgetConfigurationActivity : ComponentActivity() {
 
     private val personDao: PersonDao by inject()
+    private val widgetUpdater: WidgetUpdater by inject()
     private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,17 +87,22 @@ class WidgetConfigurationActivity : ComponentActivity() {
     private fun saveConfigurationAndExit(selectedPersonId: Long?) {
         lifecycleScope.launch {
             try {
-                // 1. Dual-store: Immediately save to SharedPreferences keyed by appWidgetId (atomic & synchronous)
+                // 1. Dual-store: Immediately save to SharedPreferences keyed by appWidgetId (atomic & synchronous commit)
                 val sp = applicationContext.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
-                sp.edit().putLong("widget_person_$appWidgetId", selectedPersonId ?: -1L).apply()
+                sp.edit().putLong("widget_person_$appWidgetId", selectedPersonId ?: -1L).commit()
 
                 // 2. Identify target AppWidget provider
                 val appWidgetInfo = AppWidgetManager.getInstance(applicationContext).getAppWidgetInfo(appWidgetId)
                 val providerClassName = appWidgetInfo?.provider?.className ?: ""
 
-                // 3. Update Glance internal state
+                // 3. Update Glance internal state with retry loop
                 val glanceManager = GlanceAppWidgetManager(applicationContext)
-                val glanceId = runCatching { glanceManager.getGlanceIdBy(appWidgetId) }.getOrNull()
+                var glanceId: GlanceId? = null
+                for (attempt in 1..4) {
+                    glanceId = runCatching { glanceManager.getGlanceIdBy(appWidgetId) }.getOrNull()
+                    if (glanceId != null) break
+                    delay(60)
+                }
 
                 if (glanceId != null) {
                     runCatching {
@@ -112,6 +121,9 @@ class WidgetConfigurationActivity : ComponentActivity() {
                         runCatching { DailyScheduleWidget().update(applicationContext, glanceId) }
                     }
                 }
+
+                // 5. Trigger broadcast update across active widgets
+                widgetUpdater.notifyWidgetsChanged()
             } catch (e: Exception) {
                 Log.e("WidgetConfig", "Failed to update widget state for appWidgetId=$appWidgetId", e)
             } finally {

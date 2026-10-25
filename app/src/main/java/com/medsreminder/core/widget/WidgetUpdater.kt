@@ -21,11 +21,16 @@ class AndroidWidgetUpdater(
 ) : WidgetUpdater {
 
     override suspend fun notifyWidgetsChanged() {
-        try {
+        runCatching {
             NextDoseWidget().updateAll(context)
+        }.onFailure { e ->
+            Log.w(TAG, "Notice: NextDoseWidget updateAll: ${e.message}")
+        }
+
+        runCatching {
             DailyScheduleWidget().updateAll(context)
-        } catch (e: Exception) {
-            Log.e(TAG, "Error updating Glance widgets", e)
+        }.onFailure { e ->
+            Log.w(TAG, "Notice: DailyScheduleWidget updateAll: ${e.message}")
         }
     }
 

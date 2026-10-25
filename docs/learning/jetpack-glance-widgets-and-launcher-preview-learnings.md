@@ -32,26 +32,31 @@ if (providerClassName.contains("NextDose")) {
 
 ---
 
-## 2. Dual-Store State Persistence (SharedPreferences Fallback)
+## 2. Dual-Store State Persistence & Synchronous Commit
 
 ### The Problem
-Jetpack Glance persists per-widget state asynchronously through `PreferencesGlanceStateDefinition` (backed by DataStore). During the transition when the configuration activity finishes and the launcher inflates the newly placed widget, the DataStore file may not yet be flushed to disk, causing the widget to briefly render with default (unfiltered) state.
+Jetpack Glance persists per-widget state asynchronously through `PreferencesGlanceStateDefinition` (backed by DataStore). During the transition when the configuration activity finishes and the launcher inflates the newly placed widget, the DataStore file may not yet be flushed to disk. Furthermore, using `SharedPreferences.edit().apply()` introduces asynchronous disk I/O, allowing the configuration activity to call `finish()` before preferences are physically written.
 
 ### The Solution
-Implement an atomic dual-store pattern:
-1. Save the configuration key synchronously in standard `SharedPreferences` keyed by platform `appWidgetId`.
+Implement an atomic, synchronous dual-store pattern:
+1. Save the configuration key synchronously using `.commit()` in standard `SharedPreferences` keyed by platform `appWidgetId`.
 2. Persist the state in Glance Preferences DataStore via `updateAppWidgetState()`.
-3. In `provideGlance()`, fallback to the synchronous `SharedPreferences` entry if the Glance Preferences value has not yet propagated:
+3. In `provideGlance()`, fallback to `SharedPreferences` via infallible integer `appWidgetId` extraction:
 ```kotlin
 var selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
 
 if (selectedPersonId == null) {
-    val appWidgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
+    val appWidgetId = WidgetUtils.extractAppWidgetId(id)
     if (appWidgetId != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
         val sp = context.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
         val spPersonId = sp.getLong("widget_person_$appWidgetId", -1L)
         if (spPersonId > 0) {
             selectedPersonId = spPersonId
+            runCatching {
+                updateAppWidgetState(context, id) { mutablePrefs ->
+                    mutablePrefs[WidgetConstants.PREF_SELECTED_PERSON_ID] = spPersonId
+                }
+            }
         }
     }
 }
@@ -59,30 +64,62 @@ if (selectedPersonId == null) {
 
 ---
 
-## 3. Launcher Previews in Android 12+ vs Legacy Launchers
+## 3. Infallible AppWidget ID Extraction from GlanceId
 
-Android launchers do not execute Kotlin Compose/Glance rendering pipelines to generate preview tiles in the widget picker. Without declarative preview assets in metadata, launchers display empty or blank placeholder containers.
+### The Problem
+`GlanceAppWidgetManager.getAppWidgetId(glanceId)` can throw `IllegalArgumentException` if called before Glance registers the session internally. Because `AppWidgetId` is an internal Kotlin data class in Glance, directly casting `id as AppWidgetId` causes compilation visibility errors.
 
-### Best Practices:
-1. **`android:previewLayout` (Android 12+, API 31+)**: Reference an XML layout in `res/layout/` representing a realistic mock of the widget.
-2. **`android:previewImage` (Legacy & Fallback)**: Reference a clean vector drawable in `res/drawable/` to ensure crisp rendering across different screen densities without raster pixelation.
-3. Both attributes must be specified concurrently in `appwidget-provider` XML configuration:
-```xml
-<appwidget-provider
-    xmlns:android="http://schemas.android.com/apk/res/android"
-    android:minWidth="180dp"
-    android:minHeight="110dp"
-    android:previewLayout="@layout/widget_daily_schedule_preview"
-    android:previewImage="@drawable/widget_daily_schedule_preview"
-    ... />
+### The Solution
+Extract the platform `Int` `appWidgetId` using reflection combined with regex parsing on the string representation:
+```kotlin
+fun extractAppWidgetId(glanceId: GlanceId): Int? {
+    val reflected = runCatching {
+        val method = glanceId.javaClass.getMethod("getAppWidgetId")
+        method.invoke(glanceId) as? Int
+    }.getOrNull()
+    if (reflected != null && reflected > 0) return reflected
+
+    return Regex("""appWidgetId=(\d+)""").find(glanceId.toString())?.groupValues?.get(1)?.toIntOrNull()
+}
 ```
 
 ---
 
-## 4. Instant Visual Feedback & Synchronous Instance Refresh
+## 4. Launcher Previews: Raster PNG Requirement & RemoteViews Whitelist
 
-In widget architectures, user actions (such as taking a dose or snoozing an alarm) execute in a background `ActionCallback`. Updating Room database records and scheduling alarms can take several milliseconds.
+### The Problems
+1. **Samsung One UI & OEM Raster Requirement:** While Android 12+ supports `previewLayout`, OEM launchers (notably Samsung One UI) rely heavily on `android:previewImage`. If `previewImage` points to an XML `<vector>` drawable, the system's `AppWidgetProviderInfo.loadPreviewImage()` fails to rasterize it as a bitmap, rendering a blank tile.
+2. **RemoteViews Class Whitelist in `previewLayout`:** Android `RemoteViews` enforces a strict class whitelist annotated with `@RemoteView`. Using generic `<View>` tags (e.g. for color pills or spacers) throws `android.view.InflateException: Class not allowed to be inflated android.view.View`.
 
-To achieve responsive UX:
-1. Dispatch an immediate, non-blocking visual indicator (`Toast`) on `Dispatchers.Main` directly within `ActionCallback.onAction()`.
-2. Synchronously invoke `.update(context, glanceId)` on the exact clicked widget instance before dispatching a broad system-wide update broadcast. This guarantees that the clicked widget transitions immediately to its updated state without perceived lag.
+### The Solution
+1. **Supply pre-rendered raster PNG bitmaps** in `res/drawable-nodpi/` for `android:previewImage`.
+2. **Never use `<View>` in `previewLayout` XML**: Use `<ImageView>` with `android:src` for indicators or `<android.widget.Space>` for spacing.
+
+---
+
+## 5. Main-Thread Toasts in Background ActionCallbacks
+
+User interactions inside Glance widgets dispatch through `ActionCallback.onAction()`, which executes in a background broadcast receiver context. Calling `Toast.makeText()` on background threads or coroutine scopes with restricted contexts can fail silently.
+
+### The Solution
+Always dispatch Toasts via the application context on the main Looper:
+```kotlin
+Handler(Looper.getMainLooper()).post {
+    Toast.makeText(context.applicationContext, "✅ Toma confirmada: $groupName", Toast.LENGTH_SHORT).show()
+}
+```
+
+---
+
+## 6. Decoupled Global Widget Refresh
+
+In `WidgetUpdater.notifyWidgetsChanged()`, sequentially calling `updateAll()` inside a single try-catch block creates a single point of failure: if a user only has `DailyScheduleWidget` on their screen and `NextDoseWidget().updateAll()` encounters an error, the subsequent widget update was skipped.
+
+### The Solution
+Isolate every provider's `updateAll()` call in its own `runCatching` block:
+```kotlin
+override suspend fun notifyWidgetsChanged() {
+    runCatching { NextDoseWidget().updateAll(context) }
+    runCatching { DailyScheduleWidget().updateAll(context) }
+}
+```

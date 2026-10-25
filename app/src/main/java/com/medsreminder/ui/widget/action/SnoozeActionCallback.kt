@@ -1,6 +1,8 @@
 package com.medsreminder.ui.widget.action
 
 import android.content.Context
+import android.os.Handler
+import android.os.Looper
 import android.util.Log
 import android.widget.Toast
 import androidx.glance.GlanceId
@@ -13,8 +15,6 @@ import com.medsreminder.domain.repository.MedicationScheduleRepository
 import com.medsreminder.ui.widget.DailyScheduleWidget
 import com.medsreminder.ui.widget.NextDoseWidget
 import com.medsreminder.ui.widget.WidgetConstants
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -42,8 +42,8 @@ class SnoozeActionCallback : ActionCallback, KoinComponent {
             val groupWithMeds = groupDao.getGroupById(groupId)
             val groupName = groupWithMeds?.group?.name ?: "Recordatorio"
 
-            withContext(Dispatchers.Main) {
-                Toast.makeText(context, "⏳ Pospuesto 15 min: $groupName", Toast.LENGTH_SHORT).show()
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context.applicationContext, "⏳ Pospuesto 15 min: $groupName", Toast.LENGTH_SHORT).show()
             }
 
             notificationHelper.cancelAllForGroup(groupId, notificationId)

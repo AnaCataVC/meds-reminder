@@ -19,6 +19,7 @@ import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.state.getAppWidgetState
+import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
@@ -59,12 +60,17 @@ class NextDoseWidget : GlanceAppWidget() {
         var selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
 
         if (selectedPersonId == null) {
-            val appWidgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
+            val appWidgetId = WidgetUtils.extractAppWidgetId(id)
             if (appWidgetId != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                 val sp = context.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
                 val spPersonId = sp.getLong("widget_person_$appWidgetId", -1L)
                 if (spPersonId > 0) {
                     selectedPersonId = spPersonId
+                    runCatching {
+                        updateAppWidgetState(context, id) { mutablePrefs ->
+                            mutablePrefs[WidgetConstants.PREF_SELECTED_PERSON_ID] = spPersonId
+                        }
+                    }
                 }
             }
         }
