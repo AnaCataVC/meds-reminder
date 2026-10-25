@@ -29,3 +29,10 @@
 # Jetpack Compose
 -keep class androidx.compose.** { *; }
 -dontwarn androidx.compose.**
+
+# Jetpack Glance & Widgets
+-dontwarn androidx.glance.**
+-keep class androidx.glance.** { *; }
+-keepclassmembers class androidx.glance.** { *; }
+-keep class com.medsreminder.ui.widget.** { *; }
+-keepclassmembers class com.medsreminder.ui.widget.** { *; }

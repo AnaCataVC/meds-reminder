@@ -76,6 +76,24 @@
             </intent-filter>
         </activity>
 
+        <activity
+            android:name=".ui.widget.DailyScheduleConfigurationActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".ui.widget.NextDoseConfigurationActivity"
+            android:exported="true"
+            android:theme="@android:style/Theme.Material.Light.NoActionBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" />
+            </intent-filter>
+        </activity>
+
         <!-- Next Dose Glance AppWidget Receiver -->
         <receiver
             android:name=".ui.widget.receiver.NextDoseWidgetReceiver"

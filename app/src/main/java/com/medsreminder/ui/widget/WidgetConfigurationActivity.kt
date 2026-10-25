@@ -2,6 +2,7 @@ package com.medsreminder.ui.widget
 
 import android.app.Activity
 import android.appwidget.AppWidgetManager
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color as AndroidColor
@@ -34,19 +35,23 @@ import com.medsreminder.core.widget.WidgetUpdater
 import com.medsreminder.data.local.dao.PersonDao
 import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.ui.theme.MedsReminderTheme
+import com.medsreminder.ui.widget.receiver.DailyScheduleWidgetReceiver
+import com.medsreminder.ui.widget.receiver.NextDoseWidgetReceiver
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.koin.android.ext.android.inject
 
 /**
- * Configuration Activity launched when placing a widget on the home screen.
+ * Base configuration activity launched when placing a widget on the home screen.
  * Allows the user to bind the widget instance to a specific person's profile or "Todos".
  */
-class WidgetConfigurationActivity : ComponentActivity() {
+open class WidgetConfigurationActivity : ComponentActivity() {
 
-    private val personDao: PersonDao by inject()
-    private val widgetUpdater: WidgetUpdater by inject()
-    private var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+    protected val personDao: PersonDao by inject()
+    protected val widgetUpdater: WidgetUpdater by inject()
+    protected var appWidgetId = AppWidgetManager.INVALID_APPWIDGET_ID
+
+    open val targetReceiverClass: Class<*>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -93,16 +98,10 @@ class WidgetConfigurationActivity : ComponentActivity() {
 
                 // 2. Identify target AppWidget provider
                 val appWidgetInfo = AppWidgetManager.getInstance(applicationContext).getAppWidgetInfo(appWidgetId)
-                val providerClassName = appWidgetInfo?.provider?.className ?: ""
+                val providerClassName = appWidgetInfo?.provider?.className ?: targetReceiverClass?.name ?: ""
 
-                // 3. Update Glance internal state with retry loop
-                val glanceManager = GlanceAppWidgetManager(applicationContext)
-                var glanceId: GlanceId? = null
-                for (attempt in 1..4) {
-                    glanceId = runCatching { glanceManager.getGlanceIdBy(appWidgetId) }.getOrNull()
-                    if (glanceId != null) break
-                    delay(60)
-                }
+                // 3. Obtain or synthesize GlanceId
+                val glanceId = WidgetUtils.getOrCreateGlanceId(applicationContext, appWidgetId)
 
                 if (glanceId != null) {
                     runCatching {
@@ -111,7 +110,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                         }
                     }
 
-                    // 4. Update the exact matching widget class safely without cross-class collision
+                    // 4. Update the exact matching widget class safely
                     if (providerClassName.contains("NextDose")) {
                         runCatching { NextDoseWidget().update(applicationContext, glanceId) }
                     } else if (providerClassName.contains("DailySchedule")) {
@@ -122,7 +121,21 @@ class WidgetConfigurationActivity : ComponentActivity() {
                     }
                 }
 
-                // 5. Trigger broadcast update across active widgets
+                // 5. Broadcast explicit ACTION_APPWIDGET_UPDATE to guarantee provider receiver lifecycle
+                val receiverClassToBroadcast = targetReceiverClass ?: when {
+                    providerClassName.contains("NextDose") -> NextDoseWidgetReceiver::class.java
+                    providerClassName.contains("DailySchedule") -> DailyScheduleWidgetReceiver::class.java
+                    else -> null
+                }
+                if (receiverClassToBroadcast != null) {
+                    val updateIntent = Intent(AppWidgetManager.ACTION_APPWIDGET_UPDATE).apply {
+                        component = ComponentName(applicationContext, receiverClassToBroadcast)
+                        putExtra(AppWidgetManager.EXTRA_APPWIDGET_IDS, intArrayOf(appWidgetId))
+                    }
+                    applicationContext.sendBroadcast(updateIntent)
+                }
+
+                // 6. Trigger global notification across existing active widgets
                 widgetUpdater.notifyWidgetsChanged()
             } catch (e: Exception) {
                 Log.e("WidgetConfig", "Failed to update widget state for appWidgetId=$appWidgetId", e)
@@ -238,7 +251,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                             ) {
                                 Box(
                                     modifier = Modifier
-                                        .size(20.dp)
+                                        .size(24.dp)
                                         .clip(CircleShape)
                                         .background(personColor)
                                 )
@@ -250,7 +263,7 @@ class WidgetConfigurationActivity : ComponentActivity() {
                                         fontWeight = FontWeight.Bold
                                     )
                                     Text(
-                                        text = "Solo recordatorios de ${person.name}",
+                                        text = "Solo medicamentos de ${person.name}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.outline
                                     )
@@ -271,4 +284,18 @@ class WidgetConfigurationActivity : ComponentActivity() {
             }
         }
     }
+}
+
+/**
+ * Dedicated configuration activity for the Daily Schedule widget.
+ */
+class DailyScheduleConfigurationActivity : WidgetConfigurationActivity() {
+    override val targetReceiverClass: Class<*> = DailyScheduleWidgetReceiver::class.java
+}
+
+/**
+ * Dedicated configuration activity for the Next Dose widget.
+ */
+class NextDoseConfigurationActivity : WidgetConfigurationActivity() {
+    override val targetReceiverClass: Class<*> = NextDoseWidgetReceiver::class.java
 }

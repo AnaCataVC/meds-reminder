@@ -1,99 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="match_parent"
-    android:background="@drawable/widget_preview_card_bg"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:layout_height="match_parent">
 
-    <!-- Header -->
-    <LinearLayout
+    <ImageView
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal">
-
-        <ImageView
-            android:layout_width="10dp"
-            android:layout_height="10dp"
-            android:src="@drawable/widget_preview_button_bg" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="Meds Reminder"
-            android:textColor="#4A5568"
-            android:textSize="12sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="8dp" />
-
-    <!-- Scheduled Time -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="08:30 AM"
-        android:textColor="#0061A4"
-        android:textSize="22sp"
-        android:textStyle="bold" />
-
-    <!-- Group Name -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Desayuno (Mamá)"
-        android:textColor="#1A202C"
-        android:textSize="14sp"
-        android:textStyle="bold" />
-
-    <!-- Meds -->
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Losartán 50mg, Omeprazol 20mg"
-        android:textColor="#718096"
-        android:textSize="12sp" />
-
-    <Space
-        android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
-
-    <!-- Action Buttons -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal">
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_preview_button_bg"
-            android:gravity="center"
-            android:text="✓ Tomar"
-            android:textColor="#FFFFFF"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-
-        <Space
-            android:layout_width="8dp"
-            android:layout_height="match_parent" />
-
-        <TextView
-            android:layout_width="0dp"
-            android:layout_height="36dp"
-            android:layout_weight="1"
-            android:background="@drawable/widget_preview_button_tonal_bg"
-            android:gravity="center"
-            android:text="⏱ 15m"
-            android:textColor="#001D36"
-            android:textSize="13sp"
-            android:textStyle="bold" />
-    </LinearLayout>
-
-</LinearLayout>
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:src="@drawable/widget_next_dose_preview" />
+</FrameLayout>

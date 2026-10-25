@@ -63,7 +63,8 @@ class DailyScheduleWidget : GlanceAppWidget() {
 
         // Fallback: Infallible lookup from SharedPreferences keyed by platform appWidgetId
         if (selectedPersonId == null) {
-            val appWidgetId = WidgetUtils.extractAppWidgetId(id)
+            val appWidgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
+                ?: WidgetUtils.extractAppWidgetId(id)
             if (appWidgetId != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
                 val sp = context.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
                 val spPersonId = sp.getLong("widget_person_$appWidgetId", -1L)
