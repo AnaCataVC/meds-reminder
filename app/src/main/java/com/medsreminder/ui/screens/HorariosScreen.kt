@@ -3,6 +3,7 @@ package com.medsreminder.ui.screens
 import android.graphics.Color as AndroidColor
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -30,6 +31,11 @@ import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.ui.dialogs.AddEditPersonSheet
 import com.medsreminder.ui.main.MainUiIntent
 import com.medsreminder.ui.main.MainUiState
+import com.medsreminder.ui.theme.PrimaryBlue
+import com.medsreminder.ui.theme.SuccessContainer
+import com.medsreminder.ui.theme.SuccessGreen
+import com.medsreminder.ui.theme.WarningContainer
+import com.medsreminder.ui.theme.WarningOrange
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
 
@@ -192,7 +198,7 @@ private fun PersonFilterBar(
 
         items(persons, key = { it.id }) { person ->
             val personColor = remember(person.colorHex) {
-                runCatching { Color(AndroidColor.parseColor(person.colorHex)) }.getOrDefault(Color.Gray)
+                runCatching { Color(AndroidColor.parseColor(person.colorHex)) }.getOrDefault(PrimaryBlue)
             }
 
             FilterChip(
@@ -251,7 +257,7 @@ private fun PersonSuspensionStatusBanner(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .padding(14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
@@ -324,10 +330,17 @@ private fun HorarioReminderCard(
     val today = remember { LocalDate.now() }
     val isTakenToday = group.lastTakenDate == today
     val isRestDay = !AndroidAlarmScheduler.isInActivePhase(group, today)
+    val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > System.currentTimeMillis()
+    val snoozeFormatted = remember(group.snoozeUntilEpochMs) {
+        group.snoozeUntilEpochMs?.let {
+            java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
+                .format(DateTimeFormatter.ofPattern("hh:mm a"))
+        }
+    }
 
     val personColor = remember(person?.colorHex) {
         runCatching { Color(AndroidColor.parseColor(person?.colorHex ?: "#0061A4")) }
-            .getOrDefault(Color.Gray)
+            .getOrDefault(PrimaryBlue)
     }
 
     val timeFormatted = remember(group.scheduledTime) {
@@ -413,24 +426,28 @@ private fun HorarioReminderCard(
                         Spacer(modifier = Modifier.width(8.dp))
                     }
 
+                    val isDark = isSystemInDarkTheme()
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = when {
-                            isTakenToday -> Color(0xFFE8F5E9)
+                            isTakenToday -> if (isDark) SuccessGreen.copy(alpha = 0.25f) else SuccessContainer
+                            isSnoozed -> MaterialTheme.colorScheme.tertiaryContainer
                             isRestDay -> MaterialTheme.colorScheme.surfaceVariant
-                            else -> Color(0xFFFFF3E0)
+                            else -> if (isDark) WarningOrange.copy(alpha = 0.25f) else WarningContainer
                         }
                     ) {
                         Text(
                             text = when {
                                 isTakenToday -> "✓ Tomado hoy"
+                                isSnoozed -> "⏳ Pospuesto ($snoozeFormatted)"
                                 isRestDay -> "En descanso"
                                 else -> "Pendiente"
                             },
                             color = when {
-                                isTakenToday -> Color(0xFF2E7D32)
+                                isTakenToday -> if (isDark) SuccessContainer else SuccessGreen
+                                isSnoozed -> MaterialTheme.colorScheme.onTertiaryContainer
                                 isRestDay -> MaterialTheme.colorScheme.onSurfaceVariant
-                                else -> Color(0xFFE65100)
+                                else -> if (isDark) WarningContainer else WarningOrange
                             },
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,

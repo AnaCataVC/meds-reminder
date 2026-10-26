@@ -88,6 +88,11 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                             )
                         }
 
+                        // If an expired snooze was ringing, clear it from Room so state remains clean
+                        if (group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs <= System.currentTimeMillis()) {
+                            groupDao.setSnoozeTime(groupId, null)
+                        }
+
                         // Fallback reschedule: if the user ignores the notification, ensure the next
                         // regular calendar occurrence is queued. Any active future snooze takes precedence
                         // and prevents clobbering.

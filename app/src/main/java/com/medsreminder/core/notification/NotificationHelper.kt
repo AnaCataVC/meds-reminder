@@ -37,6 +37,8 @@ class NotificationHelper(private val context: Context) {
 
         const val ACTION_CONFIRM = "com.medsreminder.ACTION_CONFIRM"
         const val ACTION_SNOOZE_10 = "com.medsreminder.ACTION_SNOOZE_10"
+        const val ACTION_SNOOZE_15 = "com.medsreminder.ACTION_SNOOZE_15"
+        const val ACTION_SNOOZE_1H = "com.medsreminder.ACTION_SNOOZE_1H"
         const val ACTION_POSTPONE_6H = "com.medsreminder.ACTION_POSTPONE_6H"
         const val ACTION_CANCEL_TODAY = "com.medsreminder.ACTION_CANCEL_TODAY"
         const val ACTION_DISMISS_PRE_ALARM = "com.medsreminder.ACTION_DISMISS_PRE_ALARM"
@@ -167,11 +169,10 @@ class NotificationHelper(private val context: Context) {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action PendingIntents
+        // Action PendingIntents (Android SystemUI strictly displays up to 3 actions reliably)
         val confirmIntent = createActionPendingIntent(ACTION_CONFIRM, group.id, notificationId, doseDate, 1)
-        val snoozeIntent = createActionPendingIntent(ACTION_SNOOZE_10, group.id, notificationId, doseDate, 2)
-        val postponeIntent = createActionPendingIntent(ACTION_POSTPONE_6H, group.id, notificationId, doseDate, 3)
-        val cancelIntent = createActionPendingIntent(ACTION_CANCEL_TODAY, group.id, notificationId, doseDate, 4)
+        val snooze15Intent = createActionPendingIntent(ACTION_SNOOZE_15, group.id, notificationId, doseDate, 2)
+        val snooze1hIntent = createActionPendingIntent(ACTION_SNOOZE_1H, group.id, notificationId, doseDate, 3)
 
         val builder = NotificationCompat.Builder(context, channelId)
             .setSmallIcon(R.drawable.ic_medication)
@@ -188,9 +189,8 @@ class NotificationHelper(private val context: Context) {
             .setAutoCancel(false)
             .setOngoing(true) // Prevent accidental swipe until user takes action
             .addAction(R.drawable.ic_check, "✅ Tomado", confirmIntent)
-            .addAction(R.drawable.ic_snooze, "⏳ 10 min", snoozeIntent)
-            .addAction(R.drawable.ic_schedule, "🕒 +6h", postponeIntent)
-            .addAction(R.drawable.ic_close, "❌ Cancelar hoy", cancelIntent)
+            .addAction(R.drawable.ic_snooze, "⏳ 15 min", snooze15Intent)
+            .addAction(R.drawable.ic_schedule, "🕒 1 hora", snooze1hIntent)
         if (!silent) builder.setFullScreenIntent(fullScreenPendingIntent, true)
 
         notificationManager.notify(notificationId, builder.build())

@@ -27,6 +27,7 @@ import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.ui.dialogs.BatteryOptimizationDialog
 import com.medsreminder.ui.main.MainUiIntent
 import com.medsreminder.ui.main.MainUiState
+import com.medsreminder.ui.theme.SuccessGreen
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,13 +42,13 @@ fun AjustesScreen(
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
-    ) { uri ->
+    ) { uri: Uri? ->
         uri?.let { onIntent(MainUiIntent.ExportBackup(it)) }
     }
 
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
+    ) { uri: Uri? ->
         uri?.let { onIntent(MainUiIntent.ImportBackup(it)) }
     }
 
@@ -56,31 +57,53 @@ fun AjustesScreen(
     }
 
     if (showRingTimeoutDialog) {
+        val options = listOf(
+            0 to "Hasta responder",
+            1 to "1 minuto",
+            3 to "3 minutos",
+            5 to "5 minutos",
+            10 to "10 minutos",
+            15 to "15 minutos"
+        )
         AlertDialog(
             onDismissRequest = { showRingTimeoutDialog = false },
             title = { Text("Duración del sonido") },
             text = {
                 Column {
-                    AlarmSettings.RING_TIMEOUT_OPTIONS.forEach { minutes ->
+                    Text(
+                        "Pasado este tiempo, la alarma sonora se detendrá y quedará un recordatorio silencioso en tus notificaciones.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    options.forEach { (mins, label) ->
                         Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .clickable {
-                                    onIntent(MainUiIntent.SetRingTimeout(minutes))
+                                    onIntent(MainUiIntent.SetRingTimeout(mins))
                                     showRingTimeoutDialog = false
                                 }
-                                .padding(vertical = 8.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                                .padding(vertical = 10.dp)
                         ) {
-                            RadioButton(selected = state.ringTimeoutMinutes == minutes, onClick = null)
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(ringTimeoutLabel(minutes))
+                            RadioButton(
+                                selected = state.ringTimeoutMinutes == mins,
+                                onClick = {
+                                    onIntent(MainUiIntent.SetRingTimeout(mins))
+                                    showRingTimeoutDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
             },
             confirmButton = {
-                TextButton(onClick = { showRingTimeoutDialog = false }) { Text("Cerrar") }
+                TextButton(onClick = { showRingTimeoutDialog = false }) {
+                    Text("Cerrar")
+                }
             }
         )
     }
@@ -88,13 +111,10 @@ fun AjustesScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = {
-                    Text(
-                        text = "Ajustes y Respaldo",
-                        fontWeight = FontWeight.Bold,
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                }
+                title = { Text("Ajustes", fontWeight = FontWeight.Bold) },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                )
             )
         }
     ) { paddingValues ->
@@ -118,7 +138,7 @@ fun AjustesScreen(
                         icon = Icons.Outlined.Alarm,
                         title = "Permiso de Alarma Exacta",
                         subtitle = if (state.hasExactAlarmPermission) "Concedido (Máxima precisión activa)" else "Restringido (Toca para activar)",
-                        statusColor = if (state.hasExactAlarmPermission) Color(0xFF2E7D32) else Color(0xFFBA1A1A),
+                        statusColor = if (state.hasExactAlarmPermission) SuccessGreen else MaterialTheme.colorScheme.error,
                         onClick = onRequestAlarmPermission
                     )
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
@@ -134,7 +154,7 @@ fun AjustesScreen(
                             icon = Icons.Outlined.Fullscreen,
                             title = "Alarma a pantalla completa",
                             subtitle = "Desactivada: la alarma no aparecerá sobre la pantalla bloqueada (Toca para activar)",
-                            statusColor = Color(0xFFBA1A1A),
+                            statusColor = MaterialTheme.colorScheme.error,
                             onClick = {
                                 context.startActivity(
                                     Intent(Settings.ACTION_MANAGE_APP_USE_FULL_SCREEN_INTENT).apply {

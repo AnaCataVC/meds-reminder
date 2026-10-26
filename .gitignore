@@ -12,3 +12,4 @@ captures/
 # Safe releases directory
 releases/
 /releases/
+.kotlin/

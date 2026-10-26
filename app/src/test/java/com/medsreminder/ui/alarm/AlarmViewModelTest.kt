@@ -120,6 +120,21 @@ class AlarmViewModelTest {
     }
 
     @Test
+    fun `snooze with arbitrary duration cancels notifications and schedules snooze`() = runTest {
+        viewModel.loadAlarm(10L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        viewModel.snooze(60L) // 1 hour snooze
+
+        verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(10L) }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) { mockScheduleRepository.snoozeSchedule(10L, any()) }
+        assertTrue(viewModel.uiState.value.isFinished)
+    }
+
+    @Test
     fun `cancelToday immediately cancels all notifications and silences audio`() = runTest {
         viewModel.loadAlarm(10L)
         testDispatcher.scheduler.advanceUntilIdle()

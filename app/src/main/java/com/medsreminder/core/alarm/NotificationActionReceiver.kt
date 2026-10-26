@@ -51,6 +51,16 @@ class NotificationActionReceiver : BroadcastReceiver(), KoinComponent {
                         scheduleRepository.confirmIntake(groupId, doseDate, notificationId)
                     }
 
+                    NotificationHelper.ACTION_SNOOZE_15 -> {
+                        val snoozeTriggerEpoch = System.currentTimeMillis() + (15 * 60 * 1000L)
+                        scheduleRepository.snoozeSchedule(groupId, snoozeTriggerEpoch, notificationId)
+                    }
+
+                    NotificationHelper.ACTION_SNOOZE_1H -> {
+                        val snoozeTriggerEpoch = System.currentTimeMillis() + (60 * 60 * 1000L)
+                        scheduleRepository.snoozeSchedule(groupId, snoozeTriggerEpoch, notificationId)
+                    }
+
                     NotificationHelper.ACTION_SNOOZE_10 -> {
                         val snoozeTriggerEpoch = System.currentTimeMillis() + (10 * 60 * 1000L)
                         scheduleRepository.snoozeSchedule(groupId, snoozeTriggerEpoch, notificationId)
