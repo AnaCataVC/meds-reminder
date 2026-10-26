@@ -2,6 +2,7 @@ package com.medsreminder
 
 import android.app.Application
 import com.medsreminder.di.appModule
+import com.medsreminder.ui.widget.WidgetPreviewHelper
 import org.koin.android.ext.koin.androidContext
 import org.koin.android.ext.koin.androidLogger
 import org.koin.core.context.startKoin
@@ -20,5 +21,7 @@ class MedsApplication : Application() {
             androidContext(this@MedsApplication)
             modules(appModule)
         }
+
+        WidgetPreviewHelper.updateGeneratedPreviews(this)
     }
 }

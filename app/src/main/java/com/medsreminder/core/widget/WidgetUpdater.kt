@@ -5,6 +5,7 @@ import android.util.Log
 import androidx.glance.appwidget.updateAll
 import com.medsreminder.ui.widget.DailyScheduleWidget
 import com.medsreminder.ui.widget.NextDoseWidget
+import com.medsreminder.ui.widget.WidgetPreviewHelper
 
 /**
  * Contract for triggering reactive updates across all active Glance AppWidgets.
@@ -32,6 +33,8 @@ class AndroidWidgetUpdater(
         }.onFailure { e ->
             Log.w(TAG, "Notice: DailyScheduleWidget updateAll: ${e.message}")
         }
+
+        WidgetPreviewHelper.updateGeneratedPreviews(context)
     }
 
     companion object {

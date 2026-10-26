@@ -65,9 +65,11 @@ class AlarmViewModel(
         scheduleRepository.confirmIntake(groupId, currentDoseDate())
     }
 
-    fun snooze10Min() = resolve { groupId ->
-        scheduleRepository.snoozeSchedule(groupId, System.currentTimeMillis() + (10 * 60 * 1000L))
+    fun snooze(minutes: Long) = resolve { groupId ->
+        scheduleRepository.snoozeSchedule(groupId, System.currentTimeMillis() + (minutes * 60 * 1000L))
     }
+
+    fun snooze10Min() = snooze(10L)
 
     fun cancelToday() = resolve { groupId ->
         scheduleRepository.skipSchedule(groupId, currentDoseDate())
