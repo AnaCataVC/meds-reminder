@@ -153,6 +153,9 @@ fun HorariosScreen(
                             onSnooze10Min = {
                                 onIntent(MainUiIntent.SnoozeGroup(groupWithMeds.group.id, 10))
                             },
+                            onCancelSnooze = {
+                                onIntent(MainUiIntent.CancelSnooze(groupWithMeds.group.id))
+                            },
                             onTestAlarm = {
                                 onIntent(MainUiIntent.TestAlarm(groupWithMeds.group.id))
                             },
@@ -323,6 +326,7 @@ private fun HorarioReminderCard(
     onToggleActive: (Boolean) -> Unit,
     onConfirmToday: () -> Unit,
     onSnooze10Min: () -> Unit,
+    onCancelSnooze: () -> Unit,
     onTestAlarm: () -> Unit,
     onClickEdit: () -> Unit
 ) {
@@ -434,25 +438,39 @@ private fun HorarioReminderCard(
                             isSnoozed -> MaterialTheme.colorScheme.tertiaryContainer
                             isRestDay -> MaterialTheme.colorScheme.surfaceVariant
                             else -> if (isDark) WarningOrange.copy(alpha = 0.25f) else WarningContainer
-                        }
+                        },
+                        modifier = if (isSnoozed) Modifier.clickable { onCancelSnooze() } else Modifier
                     ) {
-                        Text(
-                            text = when {
-                                isTakenToday -> "✓ Tomado hoy"
-                                isSnoozed -> "⏳ Pospuesto ($snoozeFormatted)"
-                                isRestDay -> "En descanso"
-                                else -> "Pendiente"
-                            },
-                            color = when {
-                                isTakenToday -> if (isDark) SuccessContainer else SuccessGreen
-                                isSnoozed -> MaterialTheme.colorScheme.onTertiaryContainer
-                                isRestDay -> MaterialTheme.colorScheme.onSurfaceVariant
-                                else -> if (isDark) WarningContainer else WarningOrange
-                            },
-                            style = MaterialTheme.typography.labelSmall,
-                            fontWeight = FontWeight.Bold,
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
-                        )
+                        ) {
+                            Text(
+                                text = when {
+                                    isTakenToday -> "✓ Tomado hoy"
+                                    isSnoozed -> "⏳ Pospuesto ($snoozeFormatted)"
+                                    isRestDay -> "En descanso"
+                                    else -> "Pendiente"
+                                },
+                                color = when {
+                                    isTakenToday -> if (isDark) SuccessContainer else SuccessGreen
+                                    isSnoozed -> MaterialTheme.colorScheme.onTertiaryContainer
+                                    isRestDay -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    else -> if (isDark) WarningContainer else WarningOrange
+                                },
+                                style = MaterialTheme.typography.labelSmall,
+                                fontWeight = FontWeight.Bold
+                            )
+                            if (isSnoozed) {
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Icon(
+                                    imageVector = Icons.Default.Close,
+                                    contentDescription = "Cancelar posposición",
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -509,14 +527,30 @@ private fun HorarioReminderCard(
                     )
                 }
 
-                OutlinedButton(
-                    onClick = onSnooze10Min,
-                    modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Icon(Icons.Default.Snooze, contentDescription = null, modifier = Modifier.size(16.dp))
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text("10m", fontSize = 13.sp)
+                if (isSnoozed) {
+                    OutlinedButton(
+                        onClick = onCancelSnooze,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        colors = ButtonDefaults.outlinedButtonColors(
+                            contentColor = MaterialTheme.colorScheme.error
+                        )
+                    ) {
+                        Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Restablecer", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
+                } else {
+                    OutlinedButton(
+                        onClick = onSnooze10Min,
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(8.dp),
+                        enabled = !isTakenToday
+                    ) {
+                        Icon(Icons.Default.Snooze, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("+10m", fontSize = 13.sp)
+                    }
                 }
 
                 Button(

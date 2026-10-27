@@ -32,6 +32,7 @@ import org.junit.Before
 import org.junit.Test
 import java.time.LocalDate
 import java.time.LocalTime
+import java.time.ZoneId
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainViewModelTest {
@@ -101,17 +102,31 @@ class MainViewModelTest {
     }
 
     @Test
-    fun `snooze intent delegates to scheduleRepository with calculated future epoch`() = runTest {
-        val beforeMs = System.currentTimeMillis() + (10 * 60 * 1000L) - 500
+    fun `snooze intent delegates to scheduleRepository with calculated future epoch based on scheduled time`() = runTest {
+        val futureTime = LocalTime.of(23, 0)
+        val group = MedicationGroupEntity(id = 42L, personId = 1L, name = "Noche", scheduledTime = futureTime)
+        coEvery { mockGroupDao.getGroupById(42L) } returns MedicationGroupWithMedications(group, emptyList())
+
+        val expectedTarget = futureTime.atDate(LocalDate.now()).plusMinutes(10)
+            .atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+
         viewModel.onIntent(MainUiIntent.SnoozeGroup(groupId = 42L, minutes = 10))
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify {
             mockScheduleRepository.snoozeSchedule(
                 eq(42L),
-                match { it >= beforeMs }
+                eq(expectedTarget)
             )
         }
+    }
+
+    @Test
+    fun `cancelSnooze intent delegates to scheduleRepository`() = runTest {
+        viewModel.onIntent(MainUiIntent.CancelSnooze(groupId = 42L))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify { mockScheduleRepository.cancelSnooze(42L) }
     }
 
     @Test

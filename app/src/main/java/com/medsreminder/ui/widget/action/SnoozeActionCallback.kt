@@ -16,10 +16,15 @@ import com.medsreminder.ui.widget.WidgetConstants
 import com.medsreminder.ui.widget.WidgetUtils
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 /**
  * Background Glance action handling 1-tap 15-minute snooze from home screen widgets.
- * Delivers immediate visual Toast feedback and forces instant widget state refresh.
+ * Operates on the alarm's scheduled time (never bringing it forward) and forces instant widget state refresh.
  */
 class SnoozeActionCallback : ActionCallback, KoinComponent {
 
@@ -35,14 +40,29 @@ class SnoozeActionCallback : ActionCallback, KoinComponent {
     ) {
         val groupId = parameters[WidgetConstants.PARAM_GROUP_ID] ?: return
         val notificationId = parameters[WidgetConstants.PARAM_NOTIFICATION_ID]
-        val snoozeEpoch = System.currentTimeMillis() + (15 * 60 * 1000L) // 15 minutes
 
         try {
             val groupWithMeds = groupDao.getGroupById(groupId)
             val groupName = groupWithMeds?.group?.name ?: "Recordatorio"
 
+            val today = LocalDate.now()
+            val now = LocalDateTime.now()
+            val baseDateTime = groupWithMeds?.let {
+                val currentSnooze = it.group.snoozeUntilEpochMs?.takeIf { epoch -> epoch > System.currentTimeMillis() }
+                if (currentSnooze != null) {
+                    Instant.ofEpochMilli(currentSnooze).atZone(ZoneId.systemDefault()).toLocalDateTime()
+                } else {
+                    it.group.scheduledTime.atDate(today)
+                }
+            } ?: now
+
+            val targetDateTime = baseDateTime.plusMinutes(15)
+            val finalDateTime = if (targetDateTime.isBefore(now)) now.plusMinutes(15) else targetDateTime
+            val snoozeEpoch = finalDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
+            val formattedTime = finalDateTime.toLocalTime().format(DateTimeFormatter.ofPattern("hh:mm a"))
+
             Handler(Looper.getMainLooper()).post {
-                Toast.makeText(context.applicationContext, "⏳ Pospuesto 15 min: $groupName", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context.applicationContext, "⏳ Pospuesto para las $formattedTime: $groupName", Toast.LENGTH_SHORT).show()
             }
 
             notificationHelper.cancelAllForGroup(groupId, notificationId)

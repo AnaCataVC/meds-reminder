@@ -40,6 +40,19 @@ class MedicationScheduleRepositoryImpl(
         widgetUpdater?.notifyWidgetsChanged()
     }
 
+    override suspend fun cancelSnooze(groupId: Long) {
+        notificationHelper.cancelAllForGroup(groupId)
+        alarmScheduler.cancelRingTimeout(groupId)
+        groupDao.setSnoozeTime(groupId, null)
+
+        val groupWithMeds = groupDao.getGroupById(groupId)
+        if (groupWithMeds != null) {
+            val updatedGroup = groupWithMeds.group.copy(snoozeUntilEpochMs = null)
+            alarmScheduler.schedule(updatedGroup)
+        }
+        widgetUpdater?.notifyWidgetsChanged()
+    }
+
     override suspend fun skipSchedule(groupId: Long, date: LocalDate, notificationId: Int?) {
         notificationHelper.cancelAllForGroup(groupId, notificationId)
         alarmScheduler.cancelRingTimeout(groupId)

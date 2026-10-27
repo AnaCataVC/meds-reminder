@@ -71,6 +71,16 @@ class MedicationScheduleRepositoryTest {
     }
 
     @Test
+    fun `cancelSnooze clears snooze time, cancels notifications, and reschedules regular alarm`() = runTest {
+        repository.cancelSnooze(5L)
+
+        verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L) }
+        verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
+        coVerify(exactly = 1) { mockGroupDao.setSnoozeTime(5L, null) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.snoozeUntilEpochMs == null }) }
+    }
+
+    @Test
     fun `skipSchedule dismisses notifications and marks group skipped`() = runTest {
         val today = LocalDate.now()
 

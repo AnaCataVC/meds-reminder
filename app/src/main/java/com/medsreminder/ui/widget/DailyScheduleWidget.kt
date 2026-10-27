@@ -203,7 +203,6 @@ class DailyScheduleWidget : GlanceAppWidget() {
                             itemId = { it.groupId }
                         ) { item ->
                             ScheduleItemRow(item = item, showPersonBadge = configuredPerson == null)
-                            Spacer(modifier = GlanceModifier.height(12.dp))
                         }
                     }
                 }
@@ -219,92 +218,97 @@ class DailyScheduleWidget : GlanceAppWidget() {
         val timeFormatted = item.scheduledTime.format(DateTimeFormatter.ofPattern("hh:mm a"))
         val isDone = item.isTakenToday
 
-        Box(
-            modifier = GlanceModifier
-                .fillMaxWidth()
-                .background(GlanceTheme.colors.surfaceVariant)
-                .cornerRadius(12.dp)
-                .padding(horizontal = 14.dp, vertical = 10.dp)
+        Column(
+            modifier = GlanceModifier.fillMaxWidth()
         ) {
-            Row(
-                modifier = GlanceModifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+            Box(
+                modifier = GlanceModifier
+                    .fillMaxWidth()
+                    .background(GlanceTheme.colors.surfaceVariant)
+                    .cornerRadius(12.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
             ) {
-                if (showPersonBadge) {
-                    val badgeColor = runCatching {
-                        Color(AndroidColor.parseColor(item.personColorHex))
-                    }.getOrDefault(PrimaryBlue)
-
-                    Box(
-                        modifier = GlanceModifier
-                            .size(10.dp)
-                            .background(badgeColor)
-                            .cornerRadius(5.dp)
-                    ) {}
-                    Spacer(modifier = GlanceModifier.width(8.dp))
-                }
-
-                Column(
-                    modifier = GlanceModifier.defaultWeight()
+                Row(
+                    modifier = GlanceModifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Row(
-                        modifier = GlanceModifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    if (showPersonBadge) {
+                        val badgeColor = runCatching {
+                            Color(AndroidColor.parseColor(item.personColorHex))
+                        }.getOrDefault(PrimaryBlue)
+
+                        Box(
+                            modifier = GlanceModifier
+                                .size(10.dp)
+                                .background(badgeColor)
+                                .cornerRadius(5.dp)
+                        ) {}
+                        Spacer(modifier = GlanceModifier.width(8.dp))
+                    }
+
+                    Column(
+                        modifier = GlanceModifier.defaultWeight()
                     ) {
+                        Row(
+                            modifier = GlanceModifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = timeFormatted,
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.primary,
+                                    textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None
+                                )
+                            )
+                            Spacer(modifier = GlanceModifier.width(8.dp))
+                            Text(
+                                text = item.groupName,
+                                style = TextStyle(
+                                    fontSize = 14.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface
+                                ),
+                                maxLines = 1
+                            )
+                        }
+
+                        if (item.medications.isNotEmpty()) {
+                            Spacer(modifier = GlanceModifier.height(2.dp))
+                            Text(
+                                text = item.medications.joinToString(", "),
+                                style = TextStyle(
+                                    fontSize = 12.sp,
+                                    color = GlanceTheme.colors.onSurfaceVariant
+                                ),
+                                maxLines = 1
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = GlanceModifier.width(10.dp))
+
+                    if (isDone) {
                         Text(
-                            text = timeFormatted,
+                            text = "✓ Listo",
                             style = TextStyle(
-                                fontSize = 14.sp,
+                                fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.primary,
-                                textDecoration = if (isDone) TextDecoration.LineThrough else TextDecoration.None
+                                color = GlanceTheme.colors.primary
                             )
                         )
-                        Spacer(modifier = GlanceModifier.width(8.dp))
-                        Text(
-                            text = item.groupName,
-                            style = TextStyle(
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Medium,
-                                color = if (isDone) GlanceTheme.colors.onSurfaceVariant else GlanceTheme.colors.onSurface
-                            ),
-                            maxLines = 1
+                    } else {
+                        Button(
+                            text = "✓ Tomar",
+                            onClick = actionRunCallback<ConfirmIntakeActionCallback>(
+                                actionParametersOf(WidgetConstants.PARAM_GROUP_ID to item.groupId)
+                            )
                         )
                     }
-
-                    if (item.medications.isNotEmpty()) {
-                        Spacer(modifier = GlanceModifier.height(2.dp))
-                        Text(
-                            text = item.medications.joinToString(", "),
-                            style = TextStyle(
-                                fontSize = 12.sp,
-                                color = GlanceTheme.colors.onSurfaceVariant
-                            ),
-                            maxLines = 1
-                        )
-                    }
-                }
-
-                Spacer(modifier = GlanceModifier.width(10.dp))
-
-                if (isDone) {
-                    Text(
-                        text = "✓ Listo",
-                        style = TextStyle(
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = GlanceTheme.colors.primary
-                        )
-                    )
-                } else {
-                    Button(
-                        text = "✓ Tomar",
-                        onClick = actionRunCallback<ConfirmIntakeActionCallback>(
-                            actionParametersOf(WidgetConstants.PARAM_GROUP_ID to item.groupId)
-                        )
-                    )
                 }
             }
+            Spacer(modifier = GlanceModifier.height(8.dp))
         }
     }
 }

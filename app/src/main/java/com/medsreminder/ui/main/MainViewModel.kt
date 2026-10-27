@@ -19,7 +19,11 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
 
 import com.medsreminder.domain.repository.MedicationScheduleRepository
 import com.medsreminder.core.widget.WidgetUpdater
@@ -118,6 +122,7 @@ class MainViewModel(
             is MainUiIntent.ToggleGroupActive -> toggleGroupActive(intent.groupId, intent.isActive)
             is MainUiIntent.ConfirmIntakeToday -> confirmIntakeToday(intent.groupId)
             is MainUiIntent.SnoozeGroup -> snoozeGroup(intent.groupId, intent.minutes)
+            is MainUiIntent.CancelSnooze -> cancelSnooze(intent.groupId)
             is MainUiIntent.SaveGroup -> saveGroup(intent)
             is MainUiIntent.DeleteGroup -> deleteGroup(intent.groupId)
             is MainUiIntent.TestAlarm -> testAlarmNow(intent.groupId)
@@ -304,9 +309,36 @@ class MainViewModel(
 
     private fun snoozeGroup(groupId: Long, minutes: Int) {
         viewModelScope.launch {
-            val triggerEpoch = System.currentTimeMillis() + (minutes * 60 * 1000L)
+            val groupWithMeds = groupDao.getGroupById(groupId)
+            val now = LocalDateTime.now()
+            val today = LocalDate.now()
+            val baseDateTime = groupWithMeds?.let {
+                val currentSnooze = it.group.snoozeUntilEpochMs?.takeIf { epoch -> epoch > System.currentTimeMillis() }
+                if (currentSnooze != null) {
+                    Instant.ofEpochMilli(currentSnooze).atZone(ZoneId.systemDefault()).toLocalDateTime()
+                } else {
+                    it.group.scheduledTime.atDate(today)
+                }
+            } ?: now
+
+            val targetDateTime = baseDateTime.plusMinutes(minutes.toLong())
+            val finalDateTime = if (targetDateTime.isBefore(now)) {
+                now.plusMinutes(minutes.toLong())
+            } else {
+                targetDateTime
+            }
+
+            val triggerEpoch = finalDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             scheduleRepository.snoozeSchedule(groupId, triggerEpoch)
-            _sideEffects.send(MainSideEffect.ShowSnackbar("Pospuesto por $minutes minutos"))
+            val formattedTime = finalDateTime.toLocalTime().format(DateTimeFormatter.ofPattern("hh:mm a"))
+            _sideEffects.send(MainSideEffect.ShowSnackbar("Pospuesto para las $formattedTime"))
+        }
+    }
+
+    private fun cancelSnooze(groupId: Long) {
+        viewModelScope.launch {
+            scheduleRepository.cancelSnooze(groupId)
+            _sideEffects.send(MainSideEffect.ShowSnackbar("Posposición cancelada. Horario restablecido."))
         }
     }
 
