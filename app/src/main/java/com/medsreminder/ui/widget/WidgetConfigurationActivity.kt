@@ -35,6 +35,7 @@ import com.medsreminder.core.widget.WidgetUpdater
 import com.medsreminder.data.local.dao.PersonDao
 import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.ui.theme.MedsReminderTheme
+import com.medsreminder.ui.theme.PrimaryBlue
 import com.medsreminder.ui.widget.receiver.DailyScheduleWidgetReceiver
 import com.medsreminder.ui.widget.receiver.NextDoseWidgetReceiver
 import kotlinx.coroutines.delay
@@ -231,7 +232,7 @@ open class WidgetConfigurationActivity : ComponentActivity() {
                     // Individual profile options
                     items(persons, key = { it.id }) { person ->
                         val personColor = remember(person.colorHex) {
-                            runCatching { Color(AndroidColor.parseColor(person.colorHex)) }.getOrDefault(Color.Gray)
+                            runCatching { Color(AndroidColor.parseColor(person.colorHex)) }.getOrDefault(PrimaryBlue)
                         }
 
                         Card(

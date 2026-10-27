@@ -4,9 +4,15 @@ import android.appwidget.AppWidgetManager
 import android.content.Context
 import android.graphics.Color as AndroidColor
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.datastore.preferences.core.Preferences
+import androidx.glance.Button
+import androidx.glance.ButtonDefaults
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -14,13 +20,11 @@ import androidx.glance.action.actionParametersOf
 import androidx.glance.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
-import androidx.glance.appwidget.GlanceAppWidgetManager
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.provideContent
-import androidx.glance.appwidget.state.getAppWidgetState
-import androidx.glance.appwidget.state.updateAppWidgetState
 import androidx.glance.background
+import androidx.glance.currentState
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -36,15 +40,16 @@ import androidx.glance.state.PreferencesGlanceStateDefinition
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
-import androidx.glance.Button
 import com.medsreminder.MainActivity
 import com.medsreminder.core.widget.WidgetScheduleItem
 import com.medsreminder.core.widget.WidgetScheduleResolver
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
 import com.medsreminder.data.local.entity.PersonEntity
+import com.medsreminder.ui.theme.PrimaryBlue
 import com.medsreminder.ui.widget.action.ConfirmIntakeActionCallback
 import com.medsreminder.ui.widget.action.SnoozeActionCallback
+import kotlinx.coroutines.flow.emptyFlow
 import org.koin.core.context.GlobalContext
 import java.time.format.DateTimeFormatter
 
@@ -56,42 +61,46 @@ class NextDoseWidget : GlanceAppWidget() {
     override var stateDefinition = PreferencesGlanceStateDefinition
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        val prefs = getAppWidgetState(context, PreferencesGlanceStateDefinition, id)
-        var selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
-
-        if (selectedPersonId == null) {
-            val appWidgetId = runCatching { GlanceAppWidgetManager(context).getAppWidgetId(id) }.getOrNull()
-                ?: WidgetUtils.extractAppWidgetId(id)
-            if (appWidgetId != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
-                val sp = context.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
-                val spPersonId = sp.getLong("widget_person_$appWidgetId", -1L)
-                if (spPersonId > 0) {
-                    selectedPersonId = spPersonId
-                    runCatching {
-                        updateAppWidgetState(context, id) { mutablePrefs ->
-                            mutablePrefs[WidgetConstants.PREF_SELECTED_PERSON_ID] = spPersonId
-                        }
-                    }
-                }
-            }
-        }
-
-        // Fetch data from Room using Koin
         val koin = runCatching { GlobalContext.get() }.getOrNull()
         val groupDao: MedicationGroupDao? = koin?.getOrNull()
         val personDao: PersonDao? = koin?.getOrNull()
 
-        val activeGroups = groupDao?.getAllActiveGroupsSync() ?: emptyList()
-        val allPersons = personDao?.getAllPersonsList() ?: emptyList()
-
-        val nextDose = WidgetScheduleResolver.resolveNextDose(
-            groupsWithMeds = activeGroups,
-            persons = allPersons,
-            selectedPersonId = selectedPersonId
-        )
-        val configuredPerson = selectedPersonId?.let { pid -> allPersons.find { it.id == pid } }
+        val initialGroups = groupDao?.getAllActiveGroupsSync() ?: emptyList()
+        val initialPersons = personDao?.getAllPersonsList() ?: emptyList()
 
         provideContent {
+            val prefs = currentState<Preferences>()
+            var selectedPersonId = prefs[WidgetConstants.PREF_SELECTED_PERSON_ID]?.takeIf { it > 0 }
+
+            // Fallback: Infallible lookup from SharedPreferences keyed by platform appWidgetId
+            if (selectedPersonId == null) {
+                val appWidgetId = WidgetUtils.extractAppWidgetId(id)
+                if (appWidgetId != null && appWidgetId != AppWidgetManager.INVALID_APPWIDGET_ID) {
+                    val sp = context.getSharedPreferences("meds_widgets_prefs", Context.MODE_PRIVATE)
+                    val spPersonId = sp.getLong("widget_person_$appWidgetId", -1L)
+                    if (spPersonId > 0) {
+                        selectedPersonId = spPersonId
+                    }
+                }
+            }
+
+            val groupsFlow = remember { groupDao?.getAllGroupsWithMedications() ?: emptyFlow() }
+            val personsFlow = remember { personDao?.getAllPersons() ?: emptyFlow() }
+
+            val groups by groupsFlow.collectAsState(initial = initialGroups)
+            val persons by personsFlow.collectAsState(initial = initialPersons)
+
+            val nextDose = remember(groups, persons, selectedPersonId) {
+                WidgetScheduleResolver.resolveNextDose(
+                    groupsWithMeds = groups,
+                    persons = persons,
+                    selectedPersonId = selectedPersonId
+                )
+            }
+            val configuredPerson = remember(persons, selectedPersonId) {
+                selectedPersonId?.let { pid -> persons.find { it.id == pid } }
+            }
+
             GlanceTheme {
                 NextDoseContent(
                     nextDose = nextDose,
@@ -124,8 +133,9 @@ class NextDoseWidget : GlanceAppWidget() {
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val badgeColor = runCatching {
-                        Color(AndroidColor.parseColor(configuredPerson?.colorHex ?: nextDose?.personColorHex ?: "#0061A4"))
-                    }.getOrDefault(Color(0xFF0061A4))
+                        val hex = configuredPerson?.colorHex ?: nextDose?.personColorHex
+                        if (hex != null) Color(AndroidColor.parseColor(hex)) else PrimaryBlue
+                    }.getOrDefault(PrimaryBlue)
 
                     Box(
                         modifier = GlanceModifier
@@ -230,6 +240,10 @@ class NextDoseWidget : GlanceAppWidget() {
                             text = "⏱ 15m",
                             onClick = actionRunCallback<SnoozeActionCallback>(
                                 actionParametersOf(WidgetConstants.PARAM_GROUP_ID to nextDose.groupId)
+                            ),
+                            colors = ButtonDefaults.buttonColors(
+                                backgroundColor = GlanceTheme.colors.secondaryContainer,
+                                contentColor = GlanceTheme.colors.onSecondaryContainer
                             ),
                             modifier = GlanceModifier.defaultWeight()
                         )
