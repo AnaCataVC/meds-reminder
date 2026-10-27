@@ -123,3 +123,99 @@ override suspend fun notifyWidgetsChanged() {
     runCatching { DailyScheduleWidget().updateAll(context) }
 }
 ```
+
+---
+
+## 7. ActionCallback Layout Isolation (`updateWidgetSafely`)
+
+### The Problem
+When handling 1-tap interactive actions (e.g. `ConfirmIntakeActionCallback` or `SnoozeActionCallback`), invoking multiple widget updates blindly on the clicked `GlanceId`:
+```kotlin
+runCatching { NextDoseWidget().update(context, glanceId) }
+runCatching { DailyScheduleWidget().update(context, glanceId) }
+```
+forces the layout of `NextDoseWidget` into `DailyScheduleWidget` (or vice versa), replacing an expanded multi-item list with a single-dose compact layout and triggering RemoteViews inflation collisions in OEM launchers.
+
+### The Solution
+Centralize instance-targeted updates in `WidgetUtils.updateWidgetSafely(context, glanceId)`. It resolves the platform `appWidgetId` provider class via `AppWidgetManager` and updates exclusively the matching widget provider:
+```kotlin
+suspend fun updateWidgetSafely(context: Context, glanceId: GlanceId) {
+    val appWidgetId = extractAppWidgetId(glanceId)
+    val appWidgetInfo = appWidgetId?.let {
+        runCatching { AppWidgetManager.getInstance(context).getAppWidgetInfo(it) }.getOrNull()
+    }
+    val providerClassName = appWidgetInfo?.provider?.className ?: ""
+
+    when {
+        providerClassName.contains("NextDose") -> runCatching { NextDoseWidget().update(context, glanceId) }
+        providerClassName.contains("DailySchedule") -> runCatching { DailyScheduleWidget().update(context, glanceId) }
+    }
+}
+```
+
+---
+
+## 8. Touch Target Containment & Clickable Collision in RemoteViews
+
+### The Problem
+In Android RemoteViews, nesting child views that hold `OnClickPendingIntent` (such as `Button("✓ Tomar")` and `Button("⏱ 15m")`) inside a root container that also declares `.clickable(actionStartActivity<MainActivity>())` causes touch event collisions. In Android launchers (particularly Samsung One UI and Pixel Launcher), touch events on the action buttons are frequently intercepted by the parent container, launching `MainActivity` rather than executing the `ActionCallback`.
+
+### The Solution
+Never place actionable Glance buttons inside a clickable parent container. Confine `.clickable(actionStartActivity<MainActivity>())` strictly to information areas (such as the header Row or dose title Column), leaving the button container free of any parent click listener:
+```kotlin
+// Header & Information: opens MainActivity
+Column(
+    modifier = GlanceModifier
+        .fillMaxWidth()
+        .clickable(actionStartActivity<MainActivity>())
+) {
+    // Header & Dose details
+}
+
+// Action Buttons: independent touch targets with zero clickable parent collisions
+Row(
+    modifier = GlanceModifier.fillMaxWidth(),
+    verticalAlignment = Alignment.CenterVertically
+) {
+    Button(
+        text = "✓ Tomar",
+        onClick = actionRunCallback<ConfirmIntakeActionCallback>(...)
+    )
+}
+```
+
+---
+
+## 9. LazyColumn Viewport Constraints and Stable Item IDs in Glance
+
+### The Problem
+1. **Unbounded Height Measurement**: In Jetpack Glance, `Column` translates into a vertical `LinearLayout` and `LazyColumn` translates into a `ListView`. Placing a `LazyColumn(modifier = GlanceModifier.fillMaxSize())` inside a parent `Column` below a header and spacer causes the `ListView` layout height to overflow the widget container, clipping bottom items and breaking scroll.
+2. **View Recycling Collisions**: Omitting `itemId` causes Glance to track items solely by their positional index. When an item transition occurs (e.g. marked as taken with strike-through), RemoteViews reuses existing view state without refreshing correctly.
+
+### The Solution
+1. Apply `GlanceModifier.fillMaxWidth().defaultWeight()` to the `LazyColumn` so it strictly occupies the remaining vertical space inside the parent `Column`.
+2. Provide stable item IDs using `itemId = { it.groupId }`:
+```kotlin
+LazyColumn(
+    modifier = GlanceModifier.fillMaxWidth().defaultWeight()
+) {
+    items(
+        items = items,
+        itemId = { it.groupId }
+    ) { item ->
+        ScheduleItemRow(item = item, showPersonBadge = configuredPerson == null)
+        Spacer(modifier = GlanceModifier.height(8.dp))
+    }
+}
+```
+
+---
+
+## 10. Chronological Overdue Dose Preservation in `resolveNextDose`
+
+### The Problem
+Filtering upcoming doses using `pendingItems.firstOrNull { it.scheduledTime >= currentTime }` skips untaken doses whose scheduled time has passed earlier today (e.g. 08:00 AM dose viewed at 08:30 AM), jumping straight to the afternoon dose. This creates the illusion that the morning schedule vanished or was deleted.
+
+### The Solution
+Untaken doses sorted chronologically (`pendingItems.firstOrNull()`) guarantee that any overdue dose remains prominently displayed as the immediate action item until explicitly taken, snoozed, or skipped.
+
