@@ -211,4 +211,43 @@ class WidgetScheduleResolverTest {
 
         assertNull(nextDose)
     }
+
+    @Test
+    fun `resolveNextDose prioritizes overdue untaken dose over upcoming future doses`() {
+        // Current time: 10:00 AM (8:00 AM dose was missed and is still untaken)
+        val referenceNow = LocalDateTime.of(2026, 10, 26, 10, 0)
+
+        val overdueUntakenDose = MedicationGroupWithMedications(
+            group = MedicationGroupEntity(
+                id = 1L,
+                personId = 1L,
+                name = "Desayuno Pendiente",
+                scheduledTime = LocalTime.of(8, 0),
+                lastTakenDate = null
+            ),
+            medications = listOf(medLosartan)
+        )
+
+        val upcomingAfternoonDose = MedicationGroupWithMedications(
+            group = MedicationGroupEntity(
+                id = 2L,
+                personId = 1L,
+                name = "Almuerzo Futuro",
+                scheduledTime = LocalTime.of(13, 0),
+                lastTakenDate = null
+            ),
+            medications = listOf(medAspirin)
+        )
+
+        val nextDose = WidgetScheduleResolver.resolveNextDose(
+            groupsWithMeds = listOf(upcomingAfternoonDose, overdueUntakenDose),
+            persons = allPersons,
+            selectedPersonId = null,
+            referenceNow = referenceNow
+        )
+
+        assertNotNull(nextDose)
+        assertEquals(1L, nextDose!!.groupId)
+        assertEquals("Desayuno Pendiente", nextDose.groupName)
+    }
 }

@@ -78,7 +78,7 @@ object WidgetScheduleResolver {
 
     /**
      * Identifies the immediate next relevant dose for the compact widget.
-     * Prioritizes active snoozed doses, then the earliest upcoming untaken dose, or the earliest overdue untaken dose today.
+     * Prioritizes active snoozed doses, then the earliest untaken dose of today (overdue or upcoming).
      * Returns null if all doses today are completed or suspended.
      */
     fun resolveNextDose(
@@ -92,14 +92,11 @@ object WidgetScheduleResolver {
         val pendingItems = dailyItems.filter { !it.isTakenToday && !it.isSuspended }
         if (pendingItems.isEmpty()) return null
 
-        val currentTime = referenceNow.toLocalTime()
-
         // 1. If an active snooze is ringing or pending, give it highest priority
         val snoozedItem = pendingItems.firstOrNull { it.isSnoozed }
         if (snoozedItem != null) return snoozedItem
 
-        // 2. Otherwise return the first upcoming dose, or the earliest untaken dose of today
-        val upcomingItem = pendingItems.firstOrNull { it.scheduledTime >= currentTime }
-        return upcomingItem ?: pendingItems.firstOrNull()
+        // 2. Return the earliest untaken dose of today (chronological order guarantees pending overdue doses are never skipped)
+        return pendingItems.firstOrNull()
     }
 }

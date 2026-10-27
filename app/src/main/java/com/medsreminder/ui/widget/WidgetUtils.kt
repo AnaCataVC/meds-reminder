@@ -1,5 +1,6 @@
 package com.medsreminder.ui.widget
 
+import android.appwidget.AppWidgetManager
 import android.content.Context
 import androidx.glance.GlanceId
 import androidx.glance.appwidget.GlanceAppWidgetManager
@@ -39,5 +40,26 @@ object WidgetUtils {
             ctor.isAccessible = true
             ctor.newInstance(appWidgetId) as GlanceId
         }.getOrNull()
+    }
+
+    /**
+     * Safely triggers an update on a specific GlanceId by determining its exact widget provider class.
+     * Prevents cross-polluting layouts (e.g. NextDose layout rendering inside DailySchedule widget).
+     */
+    suspend fun updateWidgetSafely(context: Context, glanceId: GlanceId) {
+        val appWidgetId = extractAppWidgetId(glanceId)
+        val appWidgetInfo = appWidgetId?.let {
+            runCatching { AppWidgetManager.getInstance(context).getAppWidgetInfo(it) }.getOrNull()
+        }
+        val providerClassName = appWidgetInfo?.provider?.className ?: ""
+
+        when {
+            providerClassName.contains("NextDose") -> {
+                runCatching { NextDoseWidget().update(context, glanceId) }
+            }
+            providerClassName.contains("DailySchedule") -> {
+                runCatching { DailyScheduleWidget().update(context, glanceId) }
+            }
+        }
     }
 }

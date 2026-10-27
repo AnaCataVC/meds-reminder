@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import com.medsreminder.core.widget.WidgetUpdater
 import com.medsreminder.domain.scheduler.AlarmScheduler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -18,6 +19,7 @@ import org.koin.core.component.inject
 class BootReceiver : BroadcastReceiver(), KoinComponent {
 
     private val alarmScheduler: AlarmScheduler by inject()
+    private val widgetUpdater: WidgetUpdater by inject()
 
     companion object {
         private const val TAG = "BootReceiver"
@@ -38,6 +40,7 @@ class BootReceiver : BroadcastReceiver(), KoinComponent {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     alarmScheduler.rescheduleAllActive()
+                    runCatching { widgetUpdater.notifyWidgetsChanged() }
                 } catch (e: Exception) {
                     Log.e(TAG, "Error rescheduling alarms on action=${intent.action}", e)
                 } finally {

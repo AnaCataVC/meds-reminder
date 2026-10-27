@@ -112,14 +112,15 @@ class NextDoseWidget : GlanceAppWidget() {
                 .background(GlanceTheme.colors.surface)
                 .cornerRadius(16.dp)
                 .padding(14.dp)
-                .clickable(actionStartActivity<MainActivity>())
         ) {
             Column(
                 modifier = GlanceModifier.fillMaxSize()
             ) {
-                // Header Row
+                // Header Row (Clickable to open MainActivity)
                 Row(
-                    modifier = GlanceModifier.fillMaxWidth(),
+                    modifier = GlanceModifier
+                        .fillMaxWidth()
+                        .clickable(actionStartActivity<MainActivity>()),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     val badgeColor = runCatching {
@@ -148,59 +149,66 @@ class NextDoseWidget : GlanceAppWidget() {
                 if (nextDose != null) {
                     val timeFormatted = nextDose.scheduledTime.format(DateTimeFormatter.ofPattern("hh:mm a"))
 
-                    // Time and Snooze Tag
-                    Row(
-                        modifier = GlanceModifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                    // Dose Info Section (Clickable to open MainActivity)
+                    Column(
+                        modifier = GlanceModifier
+                            .fillMaxWidth()
+                            .clickable(actionStartActivity<MainActivity>())
                     ) {
-                        Text(
-                            text = timeFormatted,
-                            style = TextStyle(
-                                fontSize = 20.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = GlanceTheme.colors.primary
-                            )
-                        )
-                        if (nextDose.isSnoozed) {
-                            Spacer(modifier = GlanceModifier.width(6.dp))
+                        // Time and Snooze Tag
+                        Row(
+                            modifier = GlanceModifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
                             Text(
-                                text = "⏱ Pospuesto",
+                                text = timeFormatted,
                                 style = TextStyle(
-                                    fontSize = 11.sp,
-                                    fontWeight = FontWeight.Medium,
-                                    color = GlanceTheme.colors.error
+                                    fontSize = 20.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = GlanceTheme.colors.primary
                                 )
                             )
+                            if (nextDose.isSnoozed) {
+                                Spacer(modifier = GlanceModifier.width(6.dp))
+                                Text(
+                                    text = "⏱ Pospuesto",
+                                    style = TextStyle(
+                                        fontSize = 11.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = GlanceTheme.colors.error
+                                    )
+                                )
+                            }
                         }
-                    }
 
-                    // Group Name & Person Label (if multi-person view)
-                    val labelText = if (configuredPerson == null) {
-                        "${nextDose.groupName} (${nextDose.personName})"
-                    } else {
-                        nextDose.groupName
-                    }
+                        // Group Name & Person Label (if multi-person view)
+                        val labelText = if (configuredPerson == null) {
+                            "${nextDose.groupName} (${nextDose.personName})"
+                        } else {
+                            nextDose.groupName
+                        }
 
-                    Text(
-                        text = labelText,
-                        style = TextStyle(
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium,
-                            color = GlanceTheme.colors.onSurface
-                        ),
-                        maxLines = 1
-                    )
-
-                    // Medications list
-                    if (nextDose.medications.isNotEmpty()) {
                         Text(
-                            text = nextDose.medications.joinToString(", "),
+                            text = labelText,
                             style = TextStyle(
-                                fontSize = 12.sp,
-                                color = GlanceTheme.colors.onSurfaceVariant
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Medium,
+                                color = GlanceTheme.colors.onSurface
                             ),
                             maxLines = 1
                         )
+
+                        // Medications list
+                        if (nextDose.medications.isNotEmpty()) {
+                            Text(
+                                text = nextDose.medications.joinToString(", "),
+                                style = TextStyle(
+                                    fontSize = 12.sp,
+                                    color = GlanceTheme.colors.onSurfaceVariant
+                                ),
+                                maxLines = 1
+                            )
+                        }
                     }
 
                     Spacer(modifier = GlanceModifier.defaultWeight())
@@ -229,7 +237,9 @@ class NextDoseWidget : GlanceAppWidget() {
                 } else {
                     // Empty State: All completed for today
                     Box(
-                        modifier = GlanceModifier.fillMaxSize(),
+                        modifier = GlanceModifier
+                            .fillMaxSize()
+                            .clickable(actionStartActivity<MainActivity>()),
                         contentAlignment = Alignment.Center
                     ) {
                         Column(

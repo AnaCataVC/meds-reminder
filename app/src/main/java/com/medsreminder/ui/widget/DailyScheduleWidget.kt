@@ -188,9 +188,12 @@ class DailyScheduleWidget : GlanceAppWidget() {
                     }
                 } else {
                     LazyColumn(
-                        modifier = GlanceModifier.fillMaxSize()
+                        modifier = GlanceModifier.fillMaxWidth().defaultWeight()
                     ) {
-                        items(items) { item ->
+                        items(
+                            items = items,
+                            itemId = { it.groupId }
+                        ) { item ->
                             ScheduleItemRow(item = item, showPersonBadge = configuredPerson == null)
                             Spacer(modifier = GlanceModifier.height(8.dp))
                         }

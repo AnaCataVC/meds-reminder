@@ -12,9 +12,8 @@ import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.core.widget.WidgetUpdater
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.domain.repository.MedicationScheduleRepository
-import com.medsreminder.ui.widget.DailyScheduleWidget
-import com.medsreminder.ui.widget.NextDoseWidget
 import com.medsreminder.ui.widget.WidgetConstants
+import com.medsreminder.ui.widget.WidgetUtils
 import org.koin.core.component.KoinComponent
 import org.koin.core.component.inject
 
@@ -53,9 +52,8 @@ class ConfirmIntakeActionCallback : ActionCallback, KoinComponent {
             // Confirm intake in Room & reschedule next alarm
             scheduleRepository.confirmIntake(groupId, notificationId = notificationId)
 
-            // Immediately force update on the specific widget instance clicked
-            runCatching { NextDoseWidget().update(context, glanceId) }
-            runCatching { DailyScheduleWidget().update(context, glanceId) }
+            // Immediately force update safely on the specific widget instance clicked
+            WidgetUtils.updateWidgetSafely(context, glanceId)
 
             // Broadcast update to all other active widgets
             widgetUpdater.notifyWidgetsChanged()
