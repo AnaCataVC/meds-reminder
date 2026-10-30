@@ -39,6 +39,7 @@ fun AjustesScreen(
     val context = LocalContext.current
     var showBatteryDialog by remember { mutableStateOf(false) }
     var showRingTimeoutDialog by remember { mutableStateOf(false) }
+    var showSnoozeIntervalDialog by remember { mutableStateOf(false) }
 
     val exportLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.CreateDocument("application/json")
@@ -108,6 +109,57 @@ fun AjustesScreen(
         )
     }
 
+    if (showSnoozeIntervalDialog) {
+        val snoozeOptions = listOf(
+            5 to "5 minutos",
+            10 to "10 minutos (predeterminado)",
+            15 to "15 minutos",
+            20 to "20 minutos",
+            30 to "30 minutos"
+        )
+        AlertDialog(
+            onDismissRequest = { showSnoozeIntervalDialog = false },
+            title = { Text("Intervalo de posposición") },
+            text = {
+                Column {
+                    Text(
+                        "Tiempo que se sumará a la alarma cada vez que toques el botón de posponer en tus recordatorios.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    snoozeOptions.forEach { (mins, label) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onIntent(MainUiIntent.SetDefaultSnoozeMinutes(mins))
+                                    showSnoozeIntervalDialog = false
+                                }
+                                .padding(vertical = 10.dp)
+                        ) {
+                            RadioButton(
+                                selected = state.defaultSnoozeMinutes == mins,
+                                onClick = {
+                                    onIntent(MainUiIntent.SetDefaultSnoozeMinutes(mins))
+                                    showSnoozeIntervalDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(label, style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = { showSnoozeIntervalDialog = false }) {
+                    Text("Cerrar")
+                }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -147,6 +199,13 @@ fun AjustesScreen(
                         title = "Duración del sonido",
                         subtitle = "${ringTimeoutLabel(state.ringTimeoutMinutes)}. Luego queda un aviso silencioso de dosis pendiente",
                         onClick = { showRingTimeoutDialog = true }
+                    )
+                    HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))
+                    SettingsRow(
+                        icon = Icons.Outlined.Snooze,
+                        title = "Intervalo de posposición",
+                        subtitle = "${state.defaultSnoozeMinutes} min por toque (acumulable en cada pulsación)",
+                        onClick = { showSnoozeIntervalDialog = true }
                     )
                     if (!state.canUseFullScreenIntent && Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
                         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.3f))

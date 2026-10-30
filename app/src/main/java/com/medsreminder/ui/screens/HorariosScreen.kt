@@ -23,12 +23,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
 import com.medsreminder.data.local.entity.PersonEntity
 import com.medsreminder.ui.dialogs.AddEditPersonSheet
+import com.medsreminder.ui.dialogs.SnoozeOptionsSheet
 import com.medsreminder.ui.main.MainUiIntent
 import com.medsreminder.ui.main.MainUiState
 import com.medsreminder.ui.theme.PrimaryBlue
@@ -144,14 +146,15 @@ fun HorariosScreen(
                         HorarioReminderCard(
                             groupWithMeds = groupWithMeds,
                             person = person,
+                            defaultSnoozeMinutes = state.defaultSnoozeMinutes,
                             onToggleActive = { isActive ->
                                 onIntent(MainUiIntent.ToggleGroupActive(groupWithMeds.group.id, isActive))
                             },
                             onConfirmToday = {
                                 onIntent(MainUiIntent.ConfirmIntakeToday(groupWithMeds.group.id))
                             },
-                            onSnooze10Min = {
-                                onIntent(MainUiIntent.SnoozeGroup(groupWithMeds.group.id, 10))
+                            onSnooze = { minutes ->
+                                onIntent(MainUiIntent.SnoozeGroup(groupWithMeds.group.id, minutes))
                             },
                             onCancelSnooze = {
                                 onIntent(MainUiIntent.CancelSnooze(groupWithMeds.group.id))
@@ -275,17 +278,21 @@ private fun PersonSuspensionStatusBanner(
                     modifier = Modifier.size(20.dp)
                 )
                 Spacer(modifier = Modifier.width(8.dp))
-                Column {
+                Column(modifier = Modifier.padding(end = 8.dp)) {
                     Text(
                         text = if (isSuspended) "Alarmas de ${person.name} pausadas" else "Pausar alarmas de ${person.name}",
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = FontWeight.Bold,
-                        color = if (isSuspended) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface
+                        color = if (isSuspended) MaterialTheme.colorScheme.onTertiaryContainer else MaterialTheme.colorScheme.onSurface,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Text(
                         text = if (isSuspended) "Se reactivarán automáticamente al vencer el plazo." else "Suspende todos sus recordatorios temporalmente.",
                         style = MaterialTheme.typography.bodySmall,
-                        color = if (isSuspended) MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline
+                        color = if (isSuspended) MaterialTheme.colorScheme.onTertiaryContainer.copy(alpha = 0.8f) else MaterialTheme.colorScheme.outline,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -294,23 +301,32 @@ private fun PersonSuspensionStatusBanner(
                 Button(
                     onClick = onResume,
                     colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.primary),
-                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    contentPadding = PaddingValues(horizontal = 10.dp, vertical = 0.dp),
+                    shape = RoundedCornerShape(10.dp),
+                    modifier = Modifier.height(36.dp)
                 ) {
-                    Text("Reanudar", fontSize = 12.sp)
+                    Text("Reanudar", fontSize = 12.sp, maxLines = 1)
                 }
             } else {
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
                     FilledTonalButton(
                         onClick = onSuspend6h,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Text("6h", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("6h", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                     FilledTonalButton(
                         onClick = onSuspendToday,
-                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        shape = RoundedCornerShape(10.dp),
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Text("Hoy", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        Text("Hoy", fontSize = 12.sp, fontWeight = FontWeight.Bold, maxLines = 1)
                     }
                 }
             }
@@ -323,9 +339,10 @@ private fun PersonSuspensionStatusBanner(
 private fun HorarioReminderCard(
     groupWithMeds: MedicationGroupWithMedications,
     person: PersonEntity?,
+    defaultSnoozeMinutes: Int,
     onToggleActive: (Boolean) -> Unit,
     onConfirmToday: () -> Unit,
-    onSnooze10Min: () -> Unit,
+    onSnooze: (Int) -> Unit,
     onCancelSnooze: () -> Unit,
     onTestAlarm: () -> Unit,
     onClickEdit: () -> Unit
@@ -340,6 +357,20 @@ private fun HorarioReminderCard(
             java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
                 .format(DateTimeFormatter.ofPattern("hh:mm a"))
         }
+    }
+
+    var showSnoozeSheet by remember { mutableStateOf(false) }
+
+    if (showSnoozeSheet) {
+        SnoozeOptionsSheet(
+            title = "Posponer - ${group.name}",
+            currentSnoozeFormatted = if (isSnoozed) snoozeFormatted else null,
+            onDismissRequest = { showSnoozeSheet = false },
+            onSnoozeSelected = { mins ->
+                onSnooze(mins.toInt())
+            },
+            onCancelSnooze = if (isSnoozed) onCancelSnooze else null
+        )
     }
 
     val personColor = remember(person?.colorHex) {
@@ -404,7 +435,7 @@ private fun HorarioReminderCard(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f, fill = false)) {
                     Text(
                         text = timeFormatted,
                         style = MaterialTheme.typography.headlineMedium,
@@ -415,7 +446,9 @@ private fun HorarioReminderCard(
                         text = group.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.primary
+                        color = MaterialTheme.colorScheme.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -439,7 +472,7 @@ private fun HorarioReminderCard(
                             isRestDay -> MaterialTheme.colorScheme.surfaceVariant
                             else -> if (isDark) WarningOrange.copy(alpha = 0.25f) else WarningContainer
                         },
-                        modifier = if (isSnoozed) Modifier.clickable { onCancelSnooze() } else Modifier
+                        modifier = if (isSnoozed) Modifier.clickable { showSnoozeSheet = true } else Modifier
                     ) {
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -467,7 +500,9 @@ private fun HorarioReminderCard(
                                     imageVector = Icons.Default.Close,
                                     contentDescription = "Cancelar posposición",
                                     tint = MaterialTheme.colorScheme.onTertiaryContainer,
-                                    modifier = Modifier.size(13.dp)
+                                    modifier = Modifier
+                                        .size(13.dp)
+                                        .clickable { onCancelSnooze() }
                                 )
                             }
                         }
@@ -509,65 +544,121 @@ private fun HorarioReminderCard(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // Action Buttons Strip
+            // Action Buttons Strip with strict 40.dp height and aligned elements
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(40.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Test Alarm Button
-                IconButton(
-                    onClick = onTestAlarm,
-                    modifier = Modifier.size(38.dp)
+                Surface(
+                    shape = RoundedCornerShape(10.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Icon(
-                        imageVector = Icons.Outlined.NotificationsActive,
-                        contentDescription = "Probar Alarma",
-                        tint = MaterialTheme.colorScheme.secondary
-                    )
-                }
-
-                if (isSnoozed) {
-                    OutlinedButton(
-                        onClick = onCancelSnooze,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        colors = ButtonDefaults.outlinedButtonColors(
-                            contentColor = MaterialTheme.colorScheme.error
+                    IconButton(
+                        onClick = onTestAlarm,
+                        modifier = Modifier.fillMaxSize()
+                    ) {
+                        Icon(
+                            imageVector = Icons.Outlined.NotificationsActive,
+                            contentDescription = "Probar Alarma",
+                            tint = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier.size(20.dp)
                         )
-                    ) {
-                        Icon(Icons.Default.Restore, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("Restablecer", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-                    }
-                } else {
-                    OutlinedButton(
-                        onClick = onSnooze10Min,
-                        modifier = Modifier.weight(1f),
-                        shape = RoundedCornerShape(8.dp),
-                        enabled = !isTakenToday
-                    ) {
-                        Icon(Icons.Default.Snooze, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text("+10m", fontSize = 13.sp)
                     }
                 }
 
+                // Split Snooze Button (Quick cumulative interval + dropdown trigger)
+                Row(
+                    modifier = Modifier
+                        .weight(1.1f)
+                        .fillMaxHeight(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(1.dp)
+                ) {
+                    OutlinedButton(
+                        onClick = { onSnooze(defaultSnoozeMinutes) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp, topEnd = 0.dp, bottomEnd = 0.dp),
+                        contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
+                        enabled = !isTakenToday,
+                        colors = if (isSnoozed) {
+                            ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.tertiary
+                            )
+                        } else {
+                            ButtonDefaults.outlinedButtonColors()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Snooze,
+                            contentDescription = null,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "+${defaultSnoozeMinutes}m",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    OutlinedButton(
+                        onClick = { showSnoozeSheet = true },
+                        modifier = Modifier
+                            .width(28.dp)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 10.dp, bottomEnd = 10.dp),
+                        contentPadding = PaddingValues(0.dp),
+                        enabled = !isTakenToday,
+                        colors = if (isSnoozed) {
+                            ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.tertiary
+                            )
+                        } else {
+                            ButtonDefaults.outlinedButtonColors()
+                        }
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.ArrowDropDown,
+                            contentDescription = "Opciones de posposición",
+                            modifier = Modifier.size(18.dp)
+                        )
+                    }
+                }
+
+                // Confirm Intake Button
                 Button(
                     onClick = onConfirmToday,
                     enabled = !isTakenToday,
-                    modifier = Modifier.weight(1.3f),
-                    shape = RoundedCornerShape(8.dp),
+                    modifier = Modifier
+                        .weight(1.3f)
+                        .fillMaxHeight(),
+                    shape = RoundedCornerShape(10.dp),
+                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
                 ) {
-                    Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = null,
+                        modifier = Modifier.size(16.dp)
+                    )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
                         text = if (isTakenToday) "¡Listo!" else "Marcar tomado",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp
+                        fontSize = 13.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }

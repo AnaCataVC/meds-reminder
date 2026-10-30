@@ -21,6 +21,7 @@ data class MainUiState(
     val hasNotificationPermission: Boolean = true,
     val canUseFullScreenIntent: Boolean = true,
     val ringTimeoutMinutes: Int = AlarmSettings.DEFAULT_RING_TIMEOUT_MINUTES,
+    val defaultSnoozeMinutes: Int = AlarmSettings.DEFAULT_SNOOZE_MINUTES,
     val userMessage: String? = null
 )
 
@@ -76,6 +77,7 @@ sealed interface MainUiIntent {
     data class ImportBackup(val uri: android.net.Uri) : MainUiIntent
     data object RefreshPermissions : MainUiIntent
     data class SetRingTimeout(val minutes: Int) : MainUiIntent
+    data class SetDefaultSnoozeMinutes(val minutes: Int) : MainUiIntent
     data object ClearMessage : MainUiIntent
 }
 

@@ -48,6 +48,7 @@ class MainViewModel(
     private val _hasExactAlarmPermission = MutableStateFlow(checkExactAlarmPermissionInternal())
     private val _canUseFullScreenIntent = MutableStateFlow(notificationHelper.canUseFullScreenIntent())
     private val _ringTimeoutMinutes = MutableStateFlow(alarmSettings.ringTimeoutMinutes)
+    private val _defaultSnoozeMinutes = MutableStateFlow(alarmSettings.defaultSnoozeMinutes)
 
     private val _sideEffects = Channel<MainSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
@@ -74,8 +75,9 @@ class MainViewModel(
         _dataFlow,
         _hasExactAlarmPermission,
         _canUseFullScreenIntent,
-        _ringTimeoutMinutes
-    ) { (persons, selectedId, meds, search, message), hasPermission, canUseFullScreen, ringTimeout ->
+        _ringTimeoutMinutes,
+        _defaultSnoozeMinutes
+    ) { (persons, selectedId, meds, search, message), hasPermission, canUseFullScreen, ringTimeout, defaultSnooze ->
         val groupsFlow = if (selectedId == null) {
             groupDao.getAllGroupsWithMedications()
         } else {
@@ -93,6 +95,7 @@ class MainViewModel(
                 hasExactAlarmPermission = hasPermission,
                 canUseFullScreenIntent = canUseFullScreen,
                 ringTimeoutMinutes = ringTimeout,
+                defaultSnoozeMinutes = defaultSnooze,
                 userMessage = message
             )
         }
@@ -133,6 +136,10 @@ class MainViewModel(
             is MainUiIntent.SetRingTimeout -> {
                 alarmSettings.ringTimeoutMinutes = intent.minutes
                 _ringTimeoutMinutes.value = intent.minutes
+            }
+            is MainUiIntent.SetDefaultSnoozeMinutes -> {
+                alarmSettings.defaultSnoozeMinutes = intent.minutes
+                _defaultSnoozeMinutes.value = intent.minutes
             }
             is MainUiIntent.ClearMessage -> _userMessage.value = null
         }
@@ -328,10 +335,16 @@ class MainViewModel(
                 targetDateTime
             }
 
+            val isCumulative = groupWithMeds?.group?.snoozeUntilEpochMs?.let { it > System.currentTimeMillis() } == true
             val triggerEpoch = finalDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
             scheduleRepository.snoozeSchedule(groupId, triggerEpoch)
             val formattedTime = finalDateTime.toLocalTime().format(DateTimeFormatter.ofPattern("hh:mm a"))
-            _sideEffects.send(MainSideEffect.ShowSnackbar("Pospuesto para las $formattedTime"))
+            val message = if (isCumulative) {
+                "Pospuesto para las $formattedTime (+$minutes min adicionales)"
+            } else {
+                "Pospuesto para las $formattedTime"
+            }
+            _sideEffects.send(MainSideEffect.ShowSnackbar(message))
         }
     }
 

@@ -62,6 +62,9 @@ class MainViewModelTest {
         every { mockGroupDao.getAllGroupsWithMedications() } returns flowOf(emptyList())
         every { mockGroupDao.getGroupsForPerson(any()) } returns flowOf(emptyList())
 
+        every { mockAlarmSettings.ringTimeoutMinutes } returns 5
+        every { mockAlarmSettings.defaultSnoozeMinutes } returns 10
+
         viewModel = MainViewModel(
             context = mockContext,
             personDao = mockPersonDao,
@@ -203,6 +206,56 @@ class MainViewModelTest {
 
         coVerify {
             mockPersonDao.setSuspendedUntil(1L, null)
+        }
+    }
+
+    @Test
+    fun `snooze intent accumulates over existing active future snooze time`() = runTest {
+        val futureTime = LocalTime.of(20, 0)
+        val initialSnoozeEpoch = System.currentTimeMillis() + (30 * 60 * 1000L)
+        val group = MedicationGroupEntity(
+            id = 42L,
+            personId = 1L,
+            name = "Noche",
+            scheduledTime = futureTime,
+            snoozeUntilEpochMs = initialSnoozeEpoch
+        )
+        coEvery { mockGroupDao.getGroupById(42L) } returns MedicationGroupWithMedications(group, emptyList())
+
+        val expectedTarget = java.time.Instant.ofEpochMilli(initialSnoozeEpoch)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDateTime()
+            .plusMinutes(15)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        viewModel.onIntent(MainUiIntent.SnoozeGroup(groupId = 42L, minutes = 15))
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            mockScheduleRepository.snoozeSchedule(
+                eq(42L),
+                eq(expectedTarget)
+            )
+        }
+    }
+
+    @Test
+    fun `setDefaultSnoozeMinutes intent updates settings and emits in uiState`() = runTest {
+        viewModel.uiState.test {
+            val initial = awaitItem()
+            testDispatcher.scheduler.advanceUntilIdle()
+            val loadedInitial = if (initial.isLoading) awaitItem() else initial
+            assertEquals(10, loadedInitial.defaultSnoozeMinutes)
+
+            viewModel.onIntent(MainUiIntent.SetDefaultSnoozeMinutes(15))
+            testDispatcher.scheduler.advanceUntilIdle()
+
+            io.mockk.verify { mockAlarmSettings.defaultSnoozeMinutes = 15 }
+
+            val updated = awaitItem()
+            assertEquals(15, updated.defaultSnoozeMinutes)
         }
     }
 }
