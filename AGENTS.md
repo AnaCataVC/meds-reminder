@@ -74,25 +74,28 @@ meds-reminder/
 
 ## 4. Development & Build Commands (PowerShell)
 
+> [!NOTE]
+> **JDK Environment**: On Windows systems where the default `java.exe` in PATH is Java 8, explicitly export the Android Studio JBR (`$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"`) before invoking Gradle commands to satisfy AGP 8.5+ requirements.
+
 ### Build & Run Tests
 ```powershell
 # Run unit tests
-./gradlew testDebugUnitTest
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; ./gradlew testDebugUnitTest
 
 # Run lint checks
-./gradlew lintDebug
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; ./gradlew lintDebug
 ```
 
 ### Assemble Debug APK
 ```powershell
 # Build debug APK
-./gradlew assembleDebug
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; ./gradlew assembleDebug
 ```
 
 ### Assemble Production Release APK
 ```powershell
 # Build signed production release APK
-./gradlew assembleRelease
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; ./gradlew assembleRelease
 ```
 
 > [!IMPORTANT]
@@ -112,3 +115,4 @@ meds-reminder/
 8. **Immediate Audio & Haptic Eviction (`silenceAlarmAudio()`)**: In Android 14–16 (especially Samsung One UI), `NotificationManager.cancel()` only dismisses visual notifications but does not stop ongoing audio in the system player (`NotificationPlayer`). Always pair notification cancellation with `NotificationHelper.silenceAlarmAudio()` (using `AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE` on `USAGE_ALARM` and transient stream mute) and invoke it synchronously on the UI thread before asynchronous Room database writes.
 9. **Jetpack Glance Widget Layout Isolation & Click Target Containment**: Never call `.update(context, glanceId)` with a generic or mismatched widget class without verifying `AppWidgetManager.getAppWidgetInfo(appWidgetId).provider.className` first, preventing layout cross-pollution. In Glance composables, avoid wrapping interactive action buttons inside parent containers that declare `.clickable(actionStartActivity<...>)` to prevent touch event hijacking by OEM launchers. For lists inside vertical `Column`s, always declare `GlanceModifier.fillMaxWidth().defaultWeight()` with stable keys (`itemId = { ... }`) on `LazyColumn`.
 10. **Jetpack Glance `provideGlance` vs `provideContent` Reactivity**: In Jetpack Glance, `provideGlance()` executes only when the background worker session starts. Updates triggered by `updateAppWidgetState()` or `Widget().update()` recompose `provideContent { ... }` but do NOT rerun the outer body of `provideGlance()`. All reactive preferences (`currentState<Preferences>()`) and database observation (`Flow.collectAsState()`) MUST live inside `provideContent` with `remember(deps)` for resolved state, ensuring instant filter and schedule updates without requiring launcher screen switches.
+11. **StateFlow Combinations & Kotlin Coroutines `combine` Limit**: In ViewModels, `kotlinx.coroutines.flow.combine()` only provides typed overloads for up to 5 flows. Combining 6 or more heterogeneous flows causes Kotlin to fallback to the untyped `combine(vararg)` overload emitting `Array<Any>`, breaking type inference. Always bundle related domain states (e.g., settings, permissions) into intermediate composite flows or data tuples before combining into the root `uiState`.
