@@ -2,6 +2,7 @@ package com.medsreminder.ui.alarm
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.core.alarm.AndroidAlarmScheduler
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.local.dao.MedicationGroupDao
@@ -21,6 +22,7 @@ data class AlarmUiState(
     val isLoading: Boolean = true,
     val groupWithMeds: MedicationGroupWithMedications? = null,
     val person: PersonEntity? = null,
+    val isIndividualConfirmationEnabled: Boolean = false,
     val isFinished: Boolean = false
 )
 
@@ -32,7 +34,8 @@ class AlarmViewModel(
     private val groupDao: MedicationGroupDao,
     private val personDao: PersonDao,
     private val scheduleRepository: MedicationScheduleRepository,
-    private val notificationHelper: NotificationHelper
+    private val notificationHelper: NotificationHelper,
+    private val alarmSettings: AlarmSettings
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(AlarmUiState())
@@ -55,6 +58,7 @@ class AlarmViewModel(
                     isLoading = false,
                     groupWithMeds = group,
                     person = person,
+                    isIndividualConfirmationEnabled = alarmSettings.isIndividualMedicationConfirmationEnabled,
                     isFinished = group == null
                 )
             }
@@ -63,6 +67,15 @@ class AlarmViewModel(
 
     fun confirmTaken() = resolve { groupId ->
         scheduleRepository.confirmIntake(groupId, currentDoseDate())
+    }
+
+    fun confirmPartial(takenMedicationIds: List<Long>, skippedMedicationIds: List<Long>) = resolve { groupId ->
+        scheduleRepository.confirmPartialIntake(
+            groupId = groupId,
+            date = currentDoseDate(),
+            takenMedicationIds = takenMedicationIds,
+            skippedMedicationIds = skippedMedicationIds
+        )
     }
 
     fun snooze(minutes: Long) = resolve { groupId ->

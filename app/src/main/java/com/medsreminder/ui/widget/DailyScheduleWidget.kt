@@ -291,7 +291,7 @@ class DailyScheduleWidget : GlanceAppWidget() {
 
                     if (isDone) {
                         Text(
-                            text = "✓ Listo",
+                            text = if (item.isPartialToday) "✓ Parcial (${item.takenCount}/${item.totalCount})" else "✓ Listo",
                             style = TextStyle(
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,

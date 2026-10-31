@@ -75,7 +75,8 @@ val appModule = module {
             groupDao = get(),
             personDao = get(),
             scheduleRepository = get(),
-            notificationHelper = get()
+            notificationHelper = get(),
+            alarmSettings = get()
         )
     }
 }

@@ -20,6 +20,9 @@ data class WidgetScheduleItem(
     val medications: List<String>,
     val isTakenToday: Boolean,
     val isSkippedToday: Boolean = false,
+    val isPartialToday: Boolean = false,
+    val takenCount: Int = 0,
+    val totalCount: Int = 0,
     val isSnoozed: Boolean,
     val snoozeUntilEpochMs: Long?,
     val isSuspended: Boolean
@@ -61,6 +64,11 @@ object WidgetScheduleResolver {
                 val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > referenceNowEpochMs
                 val isSuspended = person?.suspendedUntilEpochMs?.let { it > referenceNowEpochMs } ?: false
 
+                val crossRefMap = item.crossRefs.associateBy { it.medicationId }
+                val totalCount = item.medications.size
+                val takenCount = item.medications.count { med -> crossRefMap[med.id]?.lastTakenDate?.let { !it.isBefore(today) } == true }
+                val isPartialToday = isTakenToday && totalCount >= 2 && takenCount in 1 until totalCount
+
                 WidgetScheduleItem(
                     groupId = group.id,
                     personId = group.personId,
@@ -71,6 +79,9 @@ object WidgetScheduleResolver {
                     medications = item.medications.map { it.name },
                     isTakenToday = isTakenToday,
                     isSkippedToday = isSkippedToday,
+                    isPartialToday = isPartialToday,
+                    takenCount = takenCount,
+                    totalCount = totalCount,
                     isSnoozed = isSnoozed,
                     snoozeUntilEpochMs = group.snoozeUntilEpochMs,
                     isSuspended = isSuspended

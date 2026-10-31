@@ -12,6 +12,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -81,7 +82,9 @@ class AlarmActivity : ComponentActivity() {
                     AlarmPopupContent(
                         groupWithMeds = uiState.groupWithMeds!!,
                         person = uiState.person,
+                        isIndividualConfirmationEnabled = uiState.isIndividualConfirmationEnabled,
                         onConfirmTaken = { viewModel.confirmTaken() },
+                        onConfirmPartial = { taken, skipped -> viewModel.confirmPartial(taken, skipped) },
                         onSnooze = { minutes -> viewModel.snooze(minutes) },
                         onCancelToday = { viewModel.cancelToday() }
                     )
@@ -120,7 +123,9 @@ class AlarmActivity : ComponentActivity() {
 fun AlarmPopupContent(
     groupWithMeds: MedicationGroupWithMedications,
     person: PersonEntity?,
+    isIndividualConfirmationEnabled: Boolean = false,
     onConfirmTaken: () -> Unit,
+    onConfirmPartial: (takenMedicationIds: List<Long>, skippedMedicationIds: List<Long>) -> Unit,
     onSnooze: (minutes: Long) -> Unit,
     onCancelToday: () -> Unit
 ) {
@@ -143,6 +148,29 @@ fun AlarmPopupContent(
     val personColor = remember(person?.colorHex) {
         runCatching { Color(AndroidColor.parseColor(person?.colorHex ?: "#0061A4")) }
             .getOrDefault(PrimaryBlue)
+    }
+
+    val showIndividualSelection = isIndividualConfirmationEnabled && groupWithMeds.medications.size >= 2
+    val selectedMedicationIds = remember(groupWithMeds) {
+        mutableStateMapOf<Long, Boolean>().apply {
+            groupWithMeds.medications.forEach { put(it.id, true) }
+        }
+    }
+
+    val totalMeds = groupWithMeds.medications.size
+    val takenCount = if (showIndividualSelection) selectedMedicationIds.count { it.value } else totalMeds
+
+    val handleConfirm = {
+        if (!showIndividualSelection || takenCount == totalMeds) {
+            onConfirmTaken()
+        } else if (takenCount == 0) {
+            handleCancel()
+        } else {
+            val takenIds = selectedMedicationIds.filter { it.value }.keys.toList()
+            val skippedIds = selectedMedicationIds.filter { !it.value }.keys.toList()
+            Toast.makeText(context, "$takenCount de $totalMeds tomados. Restantes omitidos.", Toast.LENGTH_SHORT).show()
+            onConfirmPartial(takenIds, skippedIds)
+        }
     }
 
     val infiniteTransition = rememberInfiniteTransition(label = "pulse")
@@ -244,12 +272,26 @@ fun AlarmPopupContent(
                     elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                 ) {
                     Column(modifier = Modifier.padding(20.dp)) {
-                        Text(
-                            text = "Medicamentos a tomar:",
-                            style = MaterialTheme.typography.labelLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = if (showIndividualSelection) "Marca los medicamentos tomados:" else "Medicamentos a tomar:",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            if (showIndividualSelection) {
+                                Text(
+                                    text = "$takenCount/$totalMeds",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    fontWeight = FontWeight.Bold,
+                                    color = personColor
+                                )
+                            }
+                        }
                         Spacer(modifier = Modifier.height(10.dp))
 
                         if (groupWithMeds.medications.isEmpty()) {
@@ -258,6 +300,59 @@ fun AlarmPopupContent(
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.outline
                             )
+                        } else if (showIndividualSelection) {
+                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                groupWithMeds.medications.forEach { med ->
+                                    val isChecked = selectedMedicationIds[med.id] ?: true
+                                    Surface(
+                                        shape = RoundedCornerShape(12.dp),
+                                        color = if (isChecked) {
+                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                                        } else {
+                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                        },
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { selectedMedicationIds[med.id] = !isChecked }
+                                    ) {
+                                        Row(
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                                            verticalAlignment = Alignment.CenterVertically
+                                        ) {
+                                            Checkbox(
+                                                checked = isChecked,
+                                                onCheckedChange = { selectedMedicationIds[med.id] = it },
+                                                colors = CheckboxDefaults.colors(
+                                                    checkedColor = personColor,
+                                                    checkmarkColor = Color.White
+                                                )
+                                            )
+                                            Spacer(modifier = Modifier.width(8.dp))
+                                            Column(modifier = Modifier.weight(1f)) {
+                                                Text(
+                                                    text = med.name,
+                                                    style = MaterialTheme.typography.bodyLarge,
+                                                    fontWeight = FontWeight.SemiBold,
+                                                    color = if (isChecked) {
+                                                        MaterialTheme.colorScheme.onSurface
+                                                    } else {
+                                                        MaterialTheme.colorScheme.outline
+                                                    }
+                                                )
+                                                med.dosage?.let {
+                                                    Text(
+                                                        text = it,
+                                                        style = MaterialTheme.typography.bodySmall,
+                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                    )
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         } else {
                             FlowRow(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -292,10 +387,19 @@ fun AlarmPopupContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(bottom = 16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    if (showIndividualSelection && takenCount in 1 until totalMeds) {
+                        Text(
+                            text = "Los medicamentos no marcados se registrarán como omitidos por hoy.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                        )
+                    }
+
                     Button(
-                        onClick = onConfirmTaken,
+                        onClick = handleConfirm,
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(58.dp),
@@ -304,7 +408,12 @@ fun AlarmPopupContent(
                     ) {
                         Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(24.dp))
                         Spacer(modifier = Modifier.width(10.dp))
-                        Text("¡TOMADO! (Confirmar)", fontSize = 16.sp, fontWeight = FontWeight.Bold)
+                        val buttonText = when {
+                            !showIndividualSelection || takenCount == totalMeds -> "¡TOMADO! (Confirmar)"
+                            takenCount == 0 -> "Omitir todo hoy"
+                            else -> "Confirmar tomas ($takenCount/$totalMeds)"
+                        }
+                        Text(buttonText, fontSize = 16.sp, fontWeight = FontWeight.Bold)
                     }
 
                     Row(

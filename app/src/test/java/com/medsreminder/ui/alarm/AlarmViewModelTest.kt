@@ -1,6 +1,7 @@
 package com.medsreminder.ui.alarm
 
 import app.cash.turbine.test
+import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
@@ -26,7 +27,6 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
-import java.time.LocalDate
 import java.time.LocalTime
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -38,6 +38,7 @@ class AlarmViewModelTest {
     private val mockPersonDao = mockk<PersonDao>(relaxed = true)
     private val mockScheduleRepository = mockk<MedicationScheduleRepository>(relaxed = true)
     private val mockNotificationHelper = mockk<NotificationHelper>(relaxed = true)
+    private val mockAlarmSettings = mockk<AlarmSettings>(relaxed = true)
 
     private lateinit var viewModel: AlarmViewModel
 
@@ -58,6 +59,7 @@ class AlarmViewModelTest {
     fun setUp() {
         Dispatchers.setMain(testDispatcher)
 
+        every { mockAlarmSettings.isIndividualMedicationConfirmationEnabled } returns true
         coEvery { mockGroupDao.getGroupById(10L) } returns sampleGroupWithMeds
         every { mockPersonDao.getPersonById(1L) } returns flowOf(samplePerson)
 
@@ -65,7 +67,8 @@ class AlarmViewModelTest {
             groupDao = mockGroupDao,
             personDao = mockPersonDao,
             scheduleRepository = mockScheduleRepository,
-            notificationHelper = mockNotificationHelper
+            notificationHelper = mockNotificationHelper,
+            alarmSettings = mockAlarmSettings
         )
     }
 
@@ -83,6 +86,7 @@ class AlarmViewModelTest {
             val state = awaitItem()
             assertFalse(state.isLoading)
             assertFalse(state.isFinished)
+            assertTrue(state.isIndividualConfirmationEnabled)
             assertEquals(sampleGroupWithMeds, state.groupWithMeds)
             assertEquals(samplePerson, state.person)
         }
@@ -101,6 +105,30 @@ class AlarmViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify(exactly = 1) { mockScheduleRepository.confirmIntake(10L, any()) }
+        assertTrue(viewModel.uiState.value.isFinished)
+    }
+
+    @Test
+    fun `confirmPartial cancels notifications and calls confirmPartialIntake`() = runTest {
+        viewModel.loadAlarm(10L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        val takenIds = listOf(101L)
+        val skippedIds = listOf(102L)
+        viewModel.confirmPartial(takenIds, skippedIds)
+
+        verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(10L) }
+
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            mockScheduleRepository.confirmPartialIntake(
+                groupId = 10L,
+                date = any(),
+                takenMedicationIds = takenIds,
+                skippedMedicationIds = skippedIds
+            )
+        }
         assertTrue(viewModel.uiState.value.isFinished)
     }
 

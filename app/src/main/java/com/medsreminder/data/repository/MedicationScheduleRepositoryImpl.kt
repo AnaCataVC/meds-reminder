@@ -24,6 +24,26 @@ class MedicationScheduleRepositoryImpl(
         notificationHelper.cancelAllForGroup(groupId, notificationId)
         alarmScheduler.cancelRingTimeout(groupId)
         groupDao.markGroupAsTaken(groupId, date)
+        groupDao.markAllCrossRefsTaken(groupId, date)
+
+        val groupWithMeds = groupDao.getGroupById(groupId)
+        if (groupWithMeds != null) {
+            val updatedGroup = groupWithMeds.group.copy(lastTakenDate = date, lastSkippedDate = null, snoozeUntilEpochMs = null)
+            alarmScheduler.schedule(updatedGroup)
+        }
+        widgetUpdater?.notifyWidgetsChanged()
+    }
+
+    override suspend fun confirmPartialIntake(
+        groupId: Long,
+        date: LocalDate,
+        takenMedicationIds: List<Long>,
+        skippedMedicationIds: List<Long>,
+        notificationId: Int?
+    ) {
+        notificationHelper.cancelAllForGroup(groupId, notificationId)
+        alarmScheduler.cancelRingTimeout(groupId)
+        groupDao.recordPartialIntake(groupId, date, takenMedicationIds, skippedMedicationIds)
 
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
@@ -58,6 +78,7 @@ class MedicationScheduleRepositoryImpl(
         notificationHelper.cancelAllForGroup(groupId, notificationId)
         alarmScheduler.cancelRingTimeout(groupId)
         groupDao.markGroupSkippedToday(groupId, date)
+        groupDao.markAllCrossRefsSkipped(groupId, date)
 
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
@@ -71,6 +92,7 @@ class MedicationScheduleRepositoryImpl(
         notificationHelper.cancelAllForGroup(groupId)
         alarmScheduler.cancelRingTimeout(groupId)
         groupDao.clearGroupResolutionToday(groupId)
+        groupDao.clearCrossRefResolutions(groupId)
 
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {

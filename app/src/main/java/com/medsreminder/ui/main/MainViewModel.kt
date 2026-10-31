@@ -49,6 +49,7 @@ class MainViewModel(
     private val _canUseFullScreenIntent = MutableStateFlow(notificationHelper.canUseFullScreenIntent())
     private val _ringTimeoutMinutes = MutableStateFlow(alarmSettings.ringTimeoutMinutes)
     private val _defaultSnoozeMinutes = MutableStateFlow(alarmSettings.defaultSnoozeMinutes)
+    private val _isIndividualMedConfirmationEnabled = MutableStateFlow(alarmSettings.isIndividualMedicationConfirmationEnabled)
 
     private val _sideEffects = Channel<MainSideEffect>(Channel.BUFFERED)
     val sideEffects = _sideEffects.receiveAsFlow()
@@ -71,13 +72,20 @@ class MainViewModel(
         Tuple5(persons, selectedId, meds, search, message)
     }
 
+    private val _settingsFlow = combine(
+        _ringTimeoutMinutes,
+        _defaultSnoozeMinutes,
+        _isIndividualMedConfirmationEnabled
+    ) { ringTimeout, defaultSnooze, isIndividualMedEnabled ->
+        Triple(ringTimeout, defaultSnooze, isIndividualMedEnabled)
+    }
+
     val uiState: StateFlow<MainUiState> = combine(
         _dataFlow,
         _hasExactAlarmPermission,
         _canUseFullScreenIntent,
-        _ringTimeoutMinutes,
-        _defaultSnoozeMinutes
-    ) { (persons, selectedId, meds, search, message), hasPermission, canUseFullScreen, ringTimeout, defaultSnooze ->
+        _settingsFlow
+    ) { (persons, selectedId, meds, search, message), hasPermission, canUseFullScreen, (ringTimeout, defaultSnooze, isIndividualMedEnabled) ->
         val groupsFlow = if (selectedId == null) {
             groupDao.getAllGroupsWithMedications()
         } else {
@@ -96,6 +104,7 @@ class MainViewModel(
                 canUseFullScreenIntent = canUseFullScreen,
                 ringTimeoutMinutes = ringTimeout,
                 defaultSnoozeMinutes = defaultSnooze,
+                isIndividualMedConfirmationEnabled = isIndividualMedEnabled,
                 userMessage = message
             )
         }
@@ -141,6 +150,10 @@ class MainViewModel(
             is MainUiIntent.SetDefaultSnoozeMinutes -> {
                 alarmSettings.defaultSnoozeMinutes = intent.minutes
                 _defaultSnoozeMinutes.value = intent.minutes
+            }
+            is MainUiIntent.ToggleIndividualMedConfirmation -> {
+                alarmSettings.isIndividualMedicationConfirmationEnabled = intent.isEnabled
+                _isIndividualMedConfirmationEnabled.value = intent.isEnabled
             }
             is MainUiIntent.ClearMessage -> _userMessage.value = null
         }

@@ -19,5 +19,10 @@ data class MedicationGroupWithMedications(
             entityColumn = "medication_id"
         )
     )
-    val medications: List<MedicationEntity>
+    val medications: List<MedicationEntity>,
+    @Relation(
+        parentColumn = "id",
+        entityColumn = "group_id"
+    )
+    val crossRefs: List<MedicationGroupCrossRef> = emptyList()
 )

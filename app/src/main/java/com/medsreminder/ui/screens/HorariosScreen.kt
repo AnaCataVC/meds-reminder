@@ -359,6 +359,15 @@ private fun HorarioReminderCard(
     val isSkippedToday = group.lastSkippedDate == today
     val isRestDay = !AndroidAlarmScheduler.isInActivePhase(group, today)
     val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > System.currentTimeMillis()
+    val crossRefMap = remember(groupWithMeds.crossRefs) { groupWithMeds.crossRefs.associateBy { it.medicationId } }
+    val totalMeds = groupWithMeds.medications.size
+    val takenMedsCount = remember(crossRefMap, today, groupWithMeds.medications) {
+        groupWithMeds.medications.count { med -> crossRefMap[med.id]?.lastTakenDate == today }
+    }
+    val skippedMedsCount = remember(crossRefMap, today, groupWithMeds.medications) {
+        groupWithMeds.medications.count { med -> crossRefMap[med.id]?.lastSkippedDate == today }
+    }
+    val isPartialToday = isTakenToday && totalMeds >= 2 && takenMedsCount in 1 until totalMeds
     val snoozeFormatted = remember(group.snoozeUntilEpochMs) {
         group.snoozeUntilEpochMs?.let {
             java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalTime()
@@ -474,6 +483,7 @@ private fun HorarioReminderCard(
                     Surface(
                         shape = RoundedCornerShape(8.dp),
                         color = when {
+                            isPartialToday -> MaterialTheme.colorScheme.tertiaryContainer
                             isTakenToday -> if (isDark) SuccessGreen.copy(alpha = 0.25f) else SuccessContainer
                             isSkippedToday -> if (isDark) ErrorRed.copy(alpha = 0.25f) else ErrorContainer
                             isSnoozed -> MaterialTheme.colorScheme.tertiaryContainer
@@ -488,6 +498,7 @@ private fun HorarioReminderCard(
                         ) {
                             Text(
                                 text = when {
+                                    isPartialToday -> "✓ Parcial ($takenMedsCount/$totalMeds)"
                                     isTakenToday -> "✓ Tomado hoy"
                                     isSkippedToday -> "✕ Omitido hoy"
                                     isSnoozed -> "⏳ Pospuesto ($snoozeFormatted)"
@@ -495,6 +506,7 @@ private fun HorarioReminderCard(
                                     else -> "Pendiente"
                                 },
                                 color = when {
+                                    isPartialToday -> MaterialTheme.colorScheme.onTertiaryContainer
                                     isTakenToday -> if (isDark) SuccessContainer else SuccessGreen
                                     isSkippedToday -> if (isDark) ErrorContainer else ErrorRed
                                     isSnoozed -> MaterialTheme.colorScheme.onTertiaryContainer
@@ -531,13 +543,24 @@ private fun HorarioReminderCard(
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     groupWithMeds.medications.forEach { med ->
+                        val isMedTaken = crossRefMap[med.id]?.lastTakenDate == today
+                        val isMedSkipped = crossRefMap[med.id]?.lastSkippedDate == today
                         SuggestionChip(
                             onClick = {},
                             label = { Text("${med.name}${med.dosage?.let { " ($it)" } ?: ""}") },
                             icon = {
                                 Icon(
-                                    imageVector = Icons.Default.Medication,
+                                    imageVector = when {
+                                        isMedTaken -> Icons.Default.Check
+                                        isMedSkipped -> Icons.Default.Close
+                                        else -> Icons.Default.Medication
+                                    },
                                     contentDescription = null,
+                                    tint = when {
+                                        isMedTaken -> SuccessGreen
+                                        isMedSkipped -> ErrorRed
+                                        else -> MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
                                     modifier = Modifier.size(16.dp)
                                 )
                             }

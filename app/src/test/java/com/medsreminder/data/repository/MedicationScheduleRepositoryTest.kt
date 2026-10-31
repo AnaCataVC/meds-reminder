@@ -59,6 +59,20 @@ class MedicationScheduleRepositoryTest {
     }
 
     @Test
+    fun `confirmPartialIntake records partial intake and reschedules alarm`() = runTest {
+        val today = LocalDate.now()
+        val takenIds = listOf(10L, 20L)
+        val skippedIds = listOf(30L)
+
+        repository.confirmPartialIntake(5L, today, takenIds, skippedIds, notificationId = 1005)
+
+        verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L, 1005) }
+        verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
+        coVerify(exactly = 1) { mockGroupDao.recordPartialIntake(5L, today, takenIds, skippedIds) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today }) }
+    }
+
+    @Test
     fun `snoozeSchedule dismisses notifications and schedules snooze`() = runTest {
         val snoozeEpoch = System.currentTimeMillis() + 600_000L
 
@@ -99,5 +113,6 @@ class MedicationScheduleRepositoryTest {
         verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L) }
         verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
         coVerify(exactly = 1) { mockGroupDao.clearGroupResolutionToday(5L) }
+        coVerify(exactly = 1) { mockGroupDao.clearCrossRefResolutions(5L) }
     }
 }

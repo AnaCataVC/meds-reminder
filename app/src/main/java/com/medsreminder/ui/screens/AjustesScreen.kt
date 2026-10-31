@@ -245,7 +245,25 @@ fun AjustesScreen(
                 }
             }
 
-            // Section 2: Copia de Seguridad (SAF)
+            // Section 2: Experiencia y Alarma Avanzada
+            SectionHeader(title = "Experiencia y Modos de Alarma")
+
+            Card(
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)
+            ) {
+                Column {
+                    SettingsSwitchRow(
+                        icon = Icons.Outlined.Checklist,
+                        title = "Confirmación individual por medicamento",
+                        subtitle = "Muestra casillas en la pantalla de alarma para marcar qué medicamentos tomaste y cuáles omitiste.",
+                        checked = state.isIndividualMedConfirmationEnabled,
+                        onCheckedChange = { onIntent(MainUiIntent.ToggleIndividualMedConfirmation(it)) }
+                    )
+                }
+            }
+
+            // Section 3: Copia de Seguridad (SAF)
             SectionHeader(title = "Copia de Seguridad (100% Local)")
 
             Card(
@@ -364,6 +382,60 @@ private fun SettingsRow(
             imageVector = Icons.Default.ChevronRight,
             contentDescription = null,
             tint = MaterialTheme.colorScheme.outline
+        )
+    }
+}
+
+@Composable
+private fun SettingsSwitchRow(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onCheckedChange(!checked) }
+            .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = RoundedCornerShape(10.dp),
+            color = MaterialTheme.colorScheme.surfaceVariant,
+            modifier = Modifier.size(40.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(22.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.bodyLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+
+        Spacer(modifier = Modifier.width(8.dp))
+
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange
         )
     }
 }

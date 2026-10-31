@@ -118,5 +118,9 @@ data class MedicationGroupCrossRef(
     @ColumnInfo(name = "group_id")
     val groupId: Long,
     @ColumnInfo(name = "medication_id")
-    val medicationId: Long
+    val medicationId: Long,
+    @ColumnInfo(name = "last_taken_date", defaultValue = "NULL")
+    val lastTakenDate: LocalDate? = null,
+    @ColumnInfo(name = "last_skipped_date", defaultValue = "NULL")
+    val lastSkippedDate: LocalDate? = null
 )

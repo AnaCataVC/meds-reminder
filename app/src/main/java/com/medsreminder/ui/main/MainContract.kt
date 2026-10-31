@@ -22,6 +22,7 @@ data class MainUiState(
     val canUseFullScreenIntent: Boolean = true,
     val ringTimeoutMinutes: Int = AlarmSettings.DEFAULT_RING_TIMEOUT_MINUTES,
     val defaultSnoozeMinutes: Int = AlarmSettings.DEFAULT_SNOOZE_MINUTES,
+    val isIndividualMedConfirmationEnabled: Boolean = AlarmSettings.DEFAULT_INDIVIDUAL_MED_CONFIRMATION,
     val userMessage: String? = null
 )
 
@@ -79,6 +80,7 @@ sealed interface MainUiIntent {
     data object RefreshPermissions : MainUiIntent
     data class SetRingTimeout(val minutes: Int) : MainUiIntent
     data class SetDefaultSnoozeMinutes(val minutes: Int) : MainUiIntent
+    data class ToggleIndividualMedConfirmation(val isEnabled: Boolean) : MainUiIntent
     data object ClearMessage : MainUiIntent
 }
 

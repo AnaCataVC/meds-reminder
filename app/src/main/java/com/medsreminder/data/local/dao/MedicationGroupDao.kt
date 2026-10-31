@@ -53,6 +53,37 @@ interface MedicationGroupDao {
     @Query("UPDATE medication_groups SET last_taken_date = NULL, last_skipped_date = NULL, snooze_until_epoch_ms = NULL WHERE id = :groupId")
     suspend fun clearGroupResolutionToday(groupId: Long)
 
+    @Query("UPDATE medication_group_cross_ref SET last_taken_date = :date, last_skipped_date = NULL WHERE group_id = :groupId AND medication_id = :medicationId")
+    suspend fun markCrossRefTaken(groupId: Long, medicationId: Long, date: LocalDate)
+
+    @Query("UPDATE medication_group_cross_ref SET last_skipped_date = :date, last_taken_date = NULL WHERE group_id = :groupId AND medication_id = :medicationId")
+    suspend fun markCrossRefSkipped(groupId: Long, medicationId: Long, date: LocalDate)
+
+    @Query("UPDATE medication_group_cross_ref SET last_taken_date = :date, last_skipped_date = NULL WHERE group_id = :groupId")
+    suspend fun markAllCrossRefsTaken(groupId: Long, date: LocalDate)
+
+    @Query("UPDATE medication_group_cross_ref SET last_skipped_date = :date, last_taken_date = NULL WHERE group_id = :groupId")
+    suspend fun markAllCrossRefsSkipped(groupId: Long, date: LocalDate)
+
+    @Query("UPDATE medication_group_cross_ref SET last_taken_date = NULL, last_skipped_date = NULL WHERE group_id = :groupId")
+    suspend fun clearCrossRefResolutions(groupId: Long)
+
+    @Transaction
+    suspend fun recordPartialIntake(
+        groupId: Long,
+        date: LocalDate,
+        takenMedicationIds: List<Long>,
+        skippedMedicationIds: List<Long>
+    ) {
+        markGroupAsTaken(groupId, date)
+        for (medId in takenMedicationIds) {
+            markCrossRefTaken(groupId, medId, date)
+        }
+        for (medId in skippedMedicationIds) {
+            markCrossRefSkipped(groupId, medId, date)
+        }
+    }
+
     /**
      * Atomically saves or updates a medication group and updates its many-to-many cross references.
      */

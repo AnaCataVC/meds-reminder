@@ -8,6 +8,13 @@ import java.time.LocalDate
  */
 interface MedicationScheduleRepository {
     suspend fun confirmIntake(groupId: Long, date: LocalDate = LocalDate.now(), notificationId: Int? = null)
+    suspend fun confirmPartialIntake(
+        groupId: Long,
+        date: LocalDate = LocalDate.now(),
+        takenMedicationIds: List<Long>,
+        skippedMedicationIds: List<Long>,
+        notificationId: Int? = null
+    )
     suspend fun snoozeSchedule(groupId: Long, snoozeTriggerEpochMs: Long, notificationId: Int? = null)
     suspend fun cancelSnooze(groupId: Long)
     suspend fun skipSchedule(groupId: Long, date: LocalDate = LocalDate.now(), notificationId: Int? = null)

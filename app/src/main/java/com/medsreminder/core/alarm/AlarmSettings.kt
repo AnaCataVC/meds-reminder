@@ -19,6 +19,11 @@ class AlarmSettings(context: Context) {
         get() = prefs.getInt(KEY_DEFAULT_SNOOZE_MINUTES, DEFAULT_SNOOZE_MINUTES)
         set(value) = prefs.edit().putInt(KEY_DEFAULT_SNOOZE_MINUTES, value).apply()
 
+    /** Whether individual medication checkboxes are shown on alarm screen for partial intakes. */
+    var isIndividualMedicationConfirmationEnabled: Boolean
+        get() = prefs.getBoolean(KEY_INDIVIDUAL_MED_CONFIRMATION, DEFAULT_INDIVIDUAL_MED_CONFIRMATION)
+        set(value) = prefs.edit().putBoolean(KEY_INDIVIDUAL_MED_CONFIRMATION, value).apply()
+
     companion object {
         private const val KEY_RING_TIMEOUT_MINUTES = "ring_timeout_minutes"
         const val DEFAULT_RING_TIMEOUT_MINUTES = 5
@@ -27,5 +32,8 @@ class AlarmSettings(context: Context) {
         private const val KEY_DEFAULT_SNOOZE_MINUTES = "default_snooze_minutes"
         const val DEFAULT_SNOOZE_MINUTES = 10
         val SNOOZE_INTERVAL_OPTIONS = listOf(5, 10, 15, 20, 30)
+
+        private const val KEY_INDIVIDUAL_MED_CONFIRMATION = "individual_med_confirmation"
+        const val DEFAULT_INDIVIDUAL_MED_CONFIRMATION = false
     }
 }
