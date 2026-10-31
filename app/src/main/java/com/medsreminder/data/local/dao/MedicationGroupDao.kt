@@ -41,14 +41,17 @@ interface MedicationGroupDao {
     @Query("DELETE FROM medication_group_cross_ref WHERE group_id = :groupId")
     suspend fun deleteCrossRefsForGroup(groupId: Long)
 
-    @Query("UPDATE medication_groups SET last_taken_date = :date, snooze_until_epoch_ms = NULL WHERE id = :groupId")
+    @Query("UPDATE medication_groups SET last_taken_date = :date, last_skipped_date = NULL, snooze_until_epoch_ms = NULL WHERE id = :groupId")
     suspend fun markGroupAsTaken(groupId: Long, date: LocalDate)
 
     @Query("UPDATE medication_groups SET snooze_until_epoch_ms = :snoozeEpoch WHERE id = :groupId")
     suspend fun setSnoozeTime(groupId: Long, snoozeEpoch: Long?)
 
-    @Query("UPDATE medication_groups SET last_taken_date = :date, snooze_until_epoch_ms = NULL WHERE id = :groupId")
+    @Query("UPDATE medication_groups SET last_skipped_date = :date, last_taken_date = NULL, snooze_until_epoch_ms = NULL WHERE id = :groupId")
     suspend fun markGroupSkippedToday(groupId: Long, date: LocalDate)
+
+    @Query("UPDATE medication_groups SET last_taken_date = NULL, last_skipped_date = NULL, snooze_until_epoch_ms = NULL WHERE id = :groupId")
+    suspend fun clearGroupResolutionToday(groupId: Long)
 
     /**
      * Atomically saves or updates a medication group and updates its many-to-many cross references.

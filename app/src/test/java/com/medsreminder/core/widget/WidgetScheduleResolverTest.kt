@@ -213,6 +213,31 @@ class WidgetScheduleResolverTest {
     }
 
     @Test
+    fun `resolveNextDose returns null when all doses for today are skipped`() {
+        val referenceNow = LocalDateTime.of(2026, 10, 26, 15, 0)
+
+        val doseSkipped = MedicationGroupWithMedications(
+            group = MedicationGroupEntity(
+                id = 1L,
+                personId = 1L,
+                name = "Desayuno",
+                scheduledTime = LocalTime.of(8, 0),
+                lastSkippedDate = LocalDate.of(2026, 10, 26)
+            ),
+            medications = listOf(medLosartan)
+        )
+
+        val nextDose = WidgetScheduleResolver.resolveNextDose(
+            groupsWithMeds = listOf(doseSkipped),
+            persons = allPersons,
+            selectedPersonId = null,
+            referenceNow = referenceNow
+        )
+
+        assertNull(nextDose)
+    }
+
+    @Test
     fun `resolveNextDose prioritizes overdue untaken dose over upcoming future doses`() {
         // Current time: 10:00 AM (8:00 AM dose was missed and is still untaken)
         val referenceNow = LocalDateTime.of(2026, 10, 26, 10, 0)

@@ -172,10 +172,11 @@ class AndroidAlarmScheduler(
 
         var targetDateTime = referenceNow.toLocalDate().atTime(group.scheduledTime)
 
-        // If medication was already marked as taken today (or in the future for this cycle),
+        // If medication was already marked as taken or skipped today (or in the future for this cycle),
         // or if scheduled time already passed today, evaluate starting from tomorrow
-        val alreadyTakenToday = group.lastTakenDate != null && group.lastTakenDate >= targetDateTime.toLocalDate()
-        if (alreadyTakenToday || targetDateTime.isBefore(referenceNow) || targetDateTime.isEqual(referenceNow)) {
+        val alreadyResolvedToday = (group.lastTakenDate != null && group.lastTakenDate >= targetDateTime.toLocalDate()) ||
+                (group.lastSkippedDate != null && group.lastSkippedDate >= targetDateTime.toLocalDate())
+        if (alreadyResolvedToday || targetDateTime.isBefore(referenceNow) || targetDateTime.isEqual(referenceNow)) {
             targetDateTime = targetDateTime.plusDays(1)
         }
 

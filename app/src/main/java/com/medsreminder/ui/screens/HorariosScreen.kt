@@ -33,6 +33,8 @@ import com.medsreminder.ui.dialogs.AddEditPersonSheet
 import com.medsreminder.ui.dialogs.SnoozeOptionsSheet
 import com.medsreminder.ui.main.MainUiIntent
 import com.medsreminder.ui.main.MainUiState
+import com.medsreminder.ui.theme.ErrorContainer
+import com.medsreminder.ui.theme.ErrorRed
 import com.medsreminder.ui.theme.PrimaryBlue
 import com.medsreminder.ui.theme.SuccessContainer
 import com.medsreminder.ui.theme.SuccessGreen
@@ -152,6 +154,9 @@ fun HorariosScreen(
                             },
                             onConfirmToday = {
                                 onIntent(MainUiIntent.ConfirmIntakeToday(groupWithMeds.group.id))
+                            },
+                            onReactivateToday = {
+                                onIntent(MainUiIntent.ReactivateSchedule(groupWithMeds.group.id))
                             },
                             onSnooze = { minutes ->
                                 onIntent(MainUiIntent.SnoozeGroup(groupWithMeds.group.id, minutes))
@@ -342,6 +347,7 @@ private fun HorarioReminderCard(
     defaultSnoozeMinutes: Int,
     onToggleActive: (Boolean) -> Unit,
     onConfirmToday: () -> Unit,
+    onReactivateToday: () -> Unit,
     onSnooze: (Int) -> Unit,
     onCancelSnooze: () -> Unit,
     onTestAlarm: () -> Unit,
@@ -350,6 +356,7 @@ private fun HorarioReminderCard(
     val group = groupWithMeds.group
     val today = remember { LocalDate.now() }
     val isTakenToday = group.lastTakenDate == today
+    val isSkippedToday = group.lastSkippedDate == today
     val isRestDay = !AndroidAlarmScheduler.isInActivePhase(group, today)
     val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > System.currentTimeMillis()
     val snoozeFormatted = remember(group.snoozeUntilEpochMs) {
@@ -468,6 +475,7 @@ private fun HorarioReminderCard(
                         shape = RoundedCornerShape(8.dp),
                         color = when {
                             isTakenToday -> if (isDark) SuccessGreen.copy(alpha = 0.25f) else SuccessContainer
+                            isSkippedToday -> if (isDark) ErrorRed.copy(alpha = 0.25f) else ErrorContainer
                             isSnoozed -> MaterialTheme.colorScheme.tertiaryContainer
                             isRestDay -> MaterialTheme.colorScheme.surfaceVariant
                             else -> if (isDark) WarningOrange.copy(alpha = 0.25f) else WarningContainer
@@ -481,12 +489,14 @@ private fun HorarioReminderCard(
                             Text(
                                 text = when {
                                     isTakenToday -> "✓ Tomado hoy"
+                                    isSkippedToday -> "✕ Omitido hoy"
                                     isSnoozed -> "⏳ Pospuesto ($snoozeFormatted)"
                                     isRestDay -> "En descanso"
                                     else -> "Pendiente"
                                 },
                                 color = when {
                                     isTakenToday -> if (isDark) SuccessContainer else SuccessGreen
+                                    isSkippedToday -> if (isDark) ErrorContainer else ErrorRed
                                     isSnoozed -> MaterialTheme.colorScheme.onTertiaryContainer
                                     isRestDay -> MaterialTheme.colorScheme.onSurfaceVariant
                                     else -> if (isDark) WarningContainer else WarningOrange
@@ -586,7 +596,7 @@ private fun HorarioReminderCard(
                             .fillMaxHeight(),
                         shape = RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp, topEnd = 0.dp, bottomEnd = 0.dp),
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                        enabled = !isTakenToday,
+                        enabled = !isTakenToday && !isSkippedToday,
                         colors = if (isSnoozed) {
                             ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.tertiary
@@ -617,7 +627,7 @@ private fun HorarioReminderCard(
                             .fillMaxHeight(),
                         shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 10.dp, bottomEnd = 10.dp),
                         contentPadding = PaddingValues(0.dp),
-                        enabled = !isTakenToday,
+                        enabled = !isTakenToday && !isSkippedToday,
                         colors = if (isSnoozed) {
                             ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.tertiary
@@ -634,32 +644,61 @@ private fun HorarioReminderCard(
                     }
                 }
 
-                // Confirm Intake Button
-                Button(
-                    onClick = onConfirmToday,
-                    enabled = !isTakenToday,
-                    modifier = Modifier
-                        .weight(1.3f)
-                        .fillMaxHeight(),
-                    shape = RoundedCornerShape(10.dp),
-                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Check,
-                        contentDescription = null,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = if (isTakenToday) "¡Listo!" else "Marcar tomado",
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
+                // Action Button: Reactivate when skipped today, otherwise Confirm Intake Button
+                if (isSkippedToday) {
+                    FilledTonalButton(
+                        onClick = onReactivateToday,
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.filledTonalButtonColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                            contentColor = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Refresh,
+                            contentDescription = "Reactivar alarma",
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = "Reactivar",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                } else {
+                    Button(
+                        onClick = onConfirmToday,
+                        enabled = !isTakenToday,
+                        modifier = Modifier
+                            .weight(1.3f)
+                            .fillMaxHeight(),
+                        shape = RoundedCornerShape(10.dp),
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),
+                        colors = ButtonDefaults.buttonColors(
+                            containerColor = MaterialTheme.colorScheme.primary
+                        )
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(
+                            text = if (isTakenToday) "¡Listo!" else "Marcar tomado",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
             }
         }

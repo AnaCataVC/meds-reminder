@@ -19,6 +19,7 @@ data class WidgetScheduleItem(
     val scheduledTime: LocalTime,
     val medications: List<String>,
     val isTakenToday: Boolean,
+    val isSkippedToday: Boolean = false,
     val isSnoozed: Boolean,
     val snoozeUntilEpochMs: Long?,
     val isSuspended: Boolean
@@ -56,6 +57,7 @@ object WidgetScheduleResolver {
                 val group = item.group
                 val person = personMap[group.personId]
                 val isTakenToday = group.lastTakenDate?.let { !it.isBefore(today) } == true
+                val isSkippedToday = group.lastSkippedDate?.let { !it.isBefore(today) } == true
                 val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > referenceNowEpochMs
                 val isSuspended = person?.suspendedUntilEpochMs?.let { it > referenceNowEpochMs } ?: false
 
@@ -68,6 +70,7 @@ object WidgetScheduleResolver {
                     scheduledTime = group.scheduledTime,
                     medications = item.medications.map { it.name },
                     isTakenToday = isTakenToday,
+                    isSkippedToday = isSkippedToday,
                     isSnoozed = isSnoozed,
                     snoozeUntilEpochMs = group.snoozeUntilEpochMs,
                     isSuspended = isSuspended
@@ -89,7 +92,7 @@ object WidgetScheduleResolver {
     ): WidgetScheduleItem? {
         val dailyItems = resolveDailySchedule(groupsWithMeds, persons, selectedPersonId, referenceNow)
 
-        val pendingItems = dailyItems.filter { !it.isTakenToday && !it.isSuspended }
+        val pendingItems = dailyItems.filter { !it.isTakenToday && !it.isSkippedToday && !it.isSuspended }
         if (pendingItems.isEmpty()) return null
 
         // 1. If an active snooze is ringing or pending, give it highest priority

@@ -133,6 +133,11 @@ fun AlarmPopupContent(
         onSnooze(minutes)
     }
 
+    val handleCancel: () -> Unit = {
+        Toast.makeText(context, "Dosis omitida por hoy", Toast.LENGTH_SHORT).show()
+        onCancelToday()
+    }
+
     val group = groupWithMeds.group
     val personName = person?.name ?: "Usuario"
     val personColor = remember(person?.colorHex) {
@@ -319,7 +324,7 @@ fun AlarmPopupContent(
                         }
 
                         FilledTonalButton(
-                            onClick = onCancelToday,
+                            onClick = handleCancel,
                             modifier = Modifier
                                 .weight(1f)
                                 .height(50.dp),
@@ -331,7 +336,7 @@ fun AlarmPopupContent(
                         ) {
                             Icon(Icons.Default.Close, contentDescription = null, modifier = Modifier.size(18.dp))
                             Spacer(modifier = Modifier.width(6.dp))
-                            Text("Cancelar hoy", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
+                            Text("Omitir hoy", fontSize = 13.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }

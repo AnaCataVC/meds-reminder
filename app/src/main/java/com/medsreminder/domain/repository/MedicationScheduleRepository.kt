@@ -3,7 +3,7 @@ package com.medsreminder.domain.repository
 import java.time.LocalDate
 
 /**
- * Domain repository contract for managing medication schedule states (confirm, snooze, skip).
+ * Domain repository contract for managing medication schedule states (confirm, snooze, skip, reactivate).
  * Centralizes database updates, notification dismissals, and alarm rescheduling.
  */
 interface MedicationScheduleRepository {
@@ -11,4 +11,5 @@ interface MedicationScheduleRepository {
     suspend fun snoozeSchedule(groupId: Long, snoozeTriggerEpochMs: Long, notificationId: Int? = null)
     suspend fun cancelSnooze(groupId: Long)
     suspend fun skipSchedule(groupId: Long, date: LocalDate = LocalDate.now(), notificationId: Int? = null)
+    suspend fun reactivateSchedule(groupId: Long)
 }

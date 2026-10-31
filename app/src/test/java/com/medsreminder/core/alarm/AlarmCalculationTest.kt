@@ -139,6 +139,30 @@ class AlarmCalculationTest {
     }
 
     @Test
+    fun `calculateNextTriggerTime rolls over to next occurrence when skipped today`() {
+        val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 0)
+        val targetTime = LocalTime.of(12, 0)
+        val monWedMask = 1 or (1 shl (java.time.DayOfWeek.WEDNESDAY.value - 1))
+        val group = MedicationGroupEntity(
+            id = 2,
+            personId = 1,
+            name = "Mon-Wed Dose",
+            scheduledTime = targetTime,
+            daysOfWeekMask = monWedMask,
+            lastSkippedDate = java.time.LocalDate.of(2026, 8, 17) // Skipped Monday
+        )
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        // Next occurrence should be Wednesday (2026-08-19 12:00)
+        val expectedEpoch = LocalDateTime.of(2026, 8, 19, 12, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(expectedEpoch, triggerEpoch)
+    }
+
+    @Test
     fun `calculateNextTriggerTime returns active snooze timestamp if snooze is in future`() {
         val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 0)
         val referenceNowMs = referenceNow.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()

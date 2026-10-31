@@ -61,10 +61,12 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                         AndroidAlarmScheduler.currentDoseDate(group)
                     }
                     val isAlreadyTakenToday = group.lastTakenDate?.let { !it.isBefore(doseDate) } == true
+                    val isAlreadySkippedToday = group.lastSkippedDate?.let { !it.isBefore(doseDate) } == true
+                    val isAlreadyResolvedToday = isAlreadyTakenToday || isAlreadySkippedToday
 
                     // Check if person's alarms are currently suspended
                     val isPersonSuspended = person?.suspendedUntilEpochMs?.let { it > System.currentTimeMillis() } ?: false
-                    if (isPersonSuspended || isAlreadyTakenToday) {
+                    if (isPersonSuspended || isAlreadyResolvedToday) {
                         if (action == ACTION_FIRE_ALARM) {
                             // Automatically reschedule for tomorrow / next active day
                             alarmScheduler.schedule(groupWithMeds.group)

@@ -54,6 +54,7 @@ sealed interface MainUiIntent {
     // Group & Schedule Actions
     data class ToggleGroupActive(val groupId: Long, val isActive: Boolean) : MainUiIntent
     data class ConfirmIntakeToday(val groupId: Long) : MainUiIntent
+    data class ReactivateSchedule(val groupId: Long) : MainUiIntent
     data class SnoozeGroup(val groupId: Long, val minutes: Int) : MainUiIntent
     data class CancelSnooze(val groupId: Long) : MainUiIntent
     data class SaveGroup(

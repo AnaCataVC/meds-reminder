@@ -6,6 +6,7 @@ import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.domain.repository.MedicationScheduleRepository
 import com.medsreminder.domain.scheduler.AlarmScheduler
 import java.time.LocalDate
+import java.time.LocalTime
 
 /**
  * Concrete implementation of MedicationScheduleRepository.
@@ -26,7 +27,7 @@ class MedicationScheduleRepositoryImpl(
 
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
-            val updatedGroup = groupWithMeds.group.copy(lastTakenDate = date, snoozeUntilEpochMs = null)
+            val updatedGroup = groupWithMeds.group.copy(lastTakenDate = date, lastSkippedDate = null, snoozeUntilEpochMs = null)
             alarmScheduler.schedule(updatedGroup)
         }
         widgetUpdater?.notifyWidgetsChanged()
@@ -60,8 +61,29 @@ class MedicationScheduleRepositoryImpl(
 
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
-            val updatedGroup = groupWithMeds.group.copy(lastTakenDate = date, snoozeUntilEpochMs = null)
+            val updatedGroup = groupWithMeds.group.copy(lastSkippedDate = date, lastTakenDate = null, snoozeUntilEpochMs = null)
             alarmScheduler.schedule(updatedGroup)
+        }
+        widgetUpdater?.notifyWidgetsChanged()
+    }
+
+    override suspend fun reactivateSchedule(groupId: Long) {
+        notificationHelper.cancelAllForGroup(groupId)
+        alarmScheduler.cancelRingTimeout(groupId)
+        groupDao.clearGroupResolutionToday(groupId)
+
+        val groupWithMeds = groupDao.getGroupById(groupId)
+        if (groupWithMeds != null) {
+            val updatedGroup = groupWithMeds.group.copy(lastTakenDate = null, lastSkippedDate = null, snoozeUntilEpochMs = null)
+            val now = LocalTime.now()
+            if (now >= updatedGroup.scheduledTime) {
+                // Scheduled time already passed today: schedule to ring in 5 seconds
+                val triggerEpoch = System.currentTimeMillis() + 5_000L
+                groupDao.setSnoozeTime(groupId, triggerEpoch)
+                alarmScheduler.scheduleSnooze(groupId, triggerEpoch)
+            } else {
+                alarmScheduler.schedule(updatedGroup)
+            }
         }
         widgetUpdater?.notifyWidgetsChanged()
     }

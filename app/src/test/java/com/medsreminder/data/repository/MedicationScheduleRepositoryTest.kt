@@ -55,7 +55,7 @@ class MedicationScheduleRepositoryTest {
         verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L, 1005) }
         verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
         coVerify(exactly = 1) { mockGroupDao.markGroupAsTaken(5L, today) }
-        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today }) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today && it.lastSkippedDate == null }) }
     }
 
     @Test
@@ -89,6 +89,15 @@ class MedicationScheduleRepositoryTest {
         verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L, 1005) }
         verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
         coVerify(exactly = 1) { mockGroupDao.markGroupSkippedToday(5L, today) }
-        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today }) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastSkippedDate == today && it.lastTakenDate == null }) }
+    }
+
+    @Test
+    fun `reactivateSchedule clears resolution in Room and reschedules alarm`() = runTest {
+        repository.reactivateSchedule(5L)
+
+        verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L) }
+        verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
+        coVerify(exactly = 1) { mockGroupDao.clearGroupResolutionToday(5L) }
     }
 }

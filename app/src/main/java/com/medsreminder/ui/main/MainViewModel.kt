@@ -124,6 +124,7 @@ class MainViewModel(
 
             is MainUiIntent.ToggleGroupActive -> toggleGroupActive(intent.groupId, intent.isActive)
             is MainUiIntent.ConfirmIntakeToday -> confirmIntakeToday(intent.groupId)
+            is MainUiIntent.ReactivateSchedule -> reactivateSchedule(intent.groupId)
             is MainUiIntent.SnoozeGroup -> snoozeGroup(intent.groupId, intent.minutes)
             is MainUiIntent.CancelSnooze -> cancelSnooze(intent.groupId)
             is MainUiIntent.SaveGroup -> saveGroup(intent)
@@ -311,6 +312,13 @@ class MainViewModel(
             val today = LocalDate.now()
             scheduleRepository.confirmIntake(groupId, today)
             _sideEffects.send(MainSideEffect.ShowSnackbar("¡Toma confirmada para hoy!"))
+        }
+    }
+
+    private fun reactivateSchedule(groupId: Long) {
+        viewModelScope.launch {
+            scheduleRepository.reactivateSchedule(groupId)
+            _sideEffects.send(MainSideEffect.ShowSnackbar("Alarma reactivada para hoy"))
         }
     }
 

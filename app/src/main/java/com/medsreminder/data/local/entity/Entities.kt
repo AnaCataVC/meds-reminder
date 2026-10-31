@@ -74,6 +74,8 @@ data class MedicationGroupEntity(
     val daysOfWeekMask: Int = 127, // Bitmask: Mon(1)..Sun(64), 127 = Everyday
     @ColumnInfo(name = "last_taken_date")
     val lastTakenDate: LocalDate? = null, // Ephemeral day tracking (no log history bloat)
+    @ColumnInfo(name = "last_skipped_date", defaultValue = "NULL")
+    val lastSkippedDate: LocalDate? = null,
     @ColumnInfo(name = "snooze_until_epoch_ms")
     val snoozeUntilEpochMs: Long? = null,
     @ColumnInfo(name = "advance_notice_minutes", defaultValue = "15")
