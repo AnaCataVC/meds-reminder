@@ -1,0 +1,61 @@
+name: Release APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-release:
+    name: Build & Publish Release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Run Unit Tests
+        run: ./gradlew testDebugUnitTest
+
+      - name: Assemble Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Package Release Assets
+        run: |
+          TAG_NAME="${{ github.ref_name }}"
+          APK_SRC="app/build/outputs/apk/release/app-release.apk"
+          APK_DEST="meds-reminder-${TAG_NAME}-release.apk"
+          
+          if [ ! -f "$APK_SRC" ]; then
+            echo "Error: Release APK not found at $APK_SRC"
+            exit 1
+          fi
+          
+          cp "$APK_SRC" "$APK_DEST"
+          sha256sum "$APK_DEST" > "${APK_DEST}.sha256"
+          
+          echo "ASSET_APK=$APK_DEST" >> $GITHUB_ENV
+          echo "ASSET_SHA=${APK_DEST}.sha256" >> $GITHUB_ENV
+
+      - name: Upload Release Assets to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ env.ASSET_APK }}
+            ${{ env.ASSET_SHA }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true

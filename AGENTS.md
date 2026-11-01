@@ -79,10 +79,13 @@ meds-reminder/
 
 ### Build & Run Tests
 ```powershell
-# Run unit tests
-$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; ./gradlew testDebugUnitTest
+# Unified quality check script with automatic JBR resolution
+.\scripts\check.ps1          # Unit tests + Lint
+.\scripts\check.ps1 -Fast    # Unit tests only
+.\scripts\check.ps1 -Build   # Unit tests + Lint + assembleDebug
 
-# Run lint checks
+# Or run Gradle tasks manually
+$env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; ./gradlew testDebugUnitTest
 $env:JAVA_HOME = "C:\Program Files\Android\Android Studio\jbr"; ./gradlew lintDebug
 ```
 
