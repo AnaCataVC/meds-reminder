@@ -150,14 +150,21 @@ fun AlarmPopupContent(
             .getOrDefault(PrimaryBlue)
     }
 
-    val showIndividualSelection = isIndividualConfirmationEnabled && groupWithMeds.medications.size >= 2
-    val selectedMedicationIds = remember(groupWithMeds) {
+    val doseDate = remember(groupWithMeds) {
+        com.medsreminder.core.alarm.AndroidAlarmScheduler.currentDoseDate(groupWithMeds.group, groupWithMeds.medications)
+    }
+    val activeMeds = remember(groupWithMeds, doseDate) {
+        groupWithMeds.activeMedicationsForDate(doseDate)
+    }
+
+    val showIndividualSelection = isIndividualConfirmationEnabled && activeMeds.size >= 2
+    val selectedMedicationIds = remember(activeMeds) {
         mutableStateMapOf<Long, Boolean>().apply {
-            groupWithMeds.medications.forEach { put(it.id, true) }
+            activeMeds.forEach { put(it.id, true) }
         }
     }
 
-    val totalMeds = groupWithMeds.medications.size
+    val totalMeds = activeMeds.size
     val takenCount = if (showIndividualSelection) selectedMedicationIds.count { it.value } else totalMeds
 
     val handleConfirm = {
@@ -294,7 +301,7 @@ fun AlarmPopupContent(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        if (groupWithMeds.medications.isEmpty()) {
+                        if (activeMeds.isEmpty()) {
                             Text(
                                 text = "Sin medicamentos especificados",
                                 style = MaterialTheme.typography.bodyMedium,
@@ -302,7 +309,7 @@ fun AlarmPopupContent(
                             )
                         } else if (showIndividualSelection) {
                             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                groupWithMeds.medications.forEach { med ->
+                                activeMeds.forEach { med ->
                                     val isChecked = selectedMedicationIds[med.id] ?: true
                                     Surface(
                                         shape = RoundedCornerShape(12.dp),
@@ -358,7 +365,7 @@ fun AlarmPopupContent(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
-                                groupWithMeds.medications.forEach { med ->
+                                activeMeds.forEach { med ->
                                     SuggestionChip(
                                         onClick = {},
                                         label = {

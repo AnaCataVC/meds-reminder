@@ -27,8 +27,7 @@ class MedicationScheduleRepositoryTest {
         id = 5L,
         personId = 1L,
         name = "Vespertino",
-        scheduledTime = LocalTime.of(14, 0),
-        daysOfWeekMask = 127
+        scheduledTime = LocalTime.of(14, 0)
     )
     private val sampleGroupWithMeds = MedicationGroupWithMedications(
         group = sampleGroup,
@@ -55,7 +54,7 @@ class MedicationScheduleRepositoryTest {
         verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L, 1005) }
         verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
         coVerify(exactly = 1) { mockGroupDao.markGroupAsTaken(5L, today) }
-        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today && it.lastSkippedDate == null }) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today && it.lastSkippedDate == null }, any()) }
     }
 
     @Test
@@ -69,7 +68,7 @@ class MedicationScheduleRepositoryTest {
         verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L, 1005) }
         verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
         coVerify(exactly = 1) { mockGroupDao.recordPartialIntake(5L, today, takenIds, skippedIds) }
-        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today }) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastTakenDate == today }, any()) }
     }
 
     @Test
@@ -91,7 +90,7 @@ class MedicationScheduleRepositoryTest {
         verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L) }
         verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
         coVerify(exactly = 1) { mockGroupDao.setSnoozeTime(5L, null) }
-        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.snoozeUntilEpochMs == null }) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.snoozeUntilEpochMs == null }, any()) }
     }
 
     @Test
@@ -103,7 +102,7 @@ class MedicationScheduleRepositoryTest {
         verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(5L, 1005) }
         verify(exactly = 1) { mockAlarmScheduler.cancelRingTimeout(5L) }
         coVerify(exactly = 1) { mockGroupDao.markGroupSkippedToday(5L, today) }
-        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastSkippedDate == today && it.lastTakenDate == null }) }
+        verify(exactly = 1) { mockAlarmScheduler.schedule(match { it.lastSkippedDate == today && it.lastTakenDate == null }, any()) }
     }
 
     @Test

@@ -29,8 +29,22 @@ class BackupSerializationTest {
                     PersonDto(id = 2L, name = "Carlos", colorHex = "#2196F3")
                 ),
                 medications = listOf(
-                    MedicationDto(id = 101L, name = "Paracetamol", dosage = "500mg", description = "For fever"),
-                    MedicationDto(id = 102L, name = "Ibuprofeno", dosage = "400mg", description = null)
+                    MedicationDto(
+                        id = 101L,
+                        name = "Paracetamol",
+                        dosage = "500mg",
+                        description = "For fever",
+                        daysOfWeekMask = 31 // Mon-Fri
+                    ),
+                    MedicationDto(
+                        id = 102L,
+                        name = "Ibuprofeno",
+                        dosage = "400mg",
+                        description = null,
+                        cycleActiveDays = 21,
+                        cycleRestDays = 7,
+                        cycleStartDate = "2026-09-01"
+                    )
                 ),
                 medicationGroups = listOf(
                     MedicationGroupDto(
@@ -40,7 +54,6 @@ class BackupSerializationTest {
                         scheduledTime = "08:30",
                         ringtoneUriString = "content://media/internal/audio/1",
                         isActive = true,
-                        daysOfWeekMask = 127,
                         medicationIds = listOf(101L, 102L)
                     )
                 )
@@ -55,6 +68,9 @@ class BackupSerializationTest {
         assertEquals(2, decodedEnvelope.payload.persons.size)
         assertEquals("Ana", decodedEnvelope.payload.persons[0].name)
         assertEquals(2, decodedEnvelope.payload.medications.size)
+        assertEquals(31, decodedEnvelope.payload.medications[0].daysOfWeekMask)
+        assertEquals(21, decodedEnvelope.payload.medications[1].cycleActiveDays)
+        assertEquals("2026-09-01", decodedEnvelope.payload.medications[1].cycleStartDate)
         assertEquals(1, decodedEnvelope.payload.medicationGroups.size)
         assertEquals(listOf(101L, 102L), decodedEnvelope.payload.medicationGroups[0].medicationIds)
     }
@@ -74,10 +90,9 @@ class BackupSerializationTest {
     }
 
     @Test
-    fun `rest cycle survives a backup round trip`() {
+    fun `medication schedule and rest cycle survives a backup round trip`() {
         val group = MedicationGroupEntity(
-            id = 7, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(21, 0),
-            cycleActiveDays = 21, cycleRestDays = 7, cycleStartDate = LocalDate.of(2026, 9, 1)
+            id = 7, personId = 1, name = "Mañana", scheduledTime = LocalTime.of(8, 0)
         )
 
         val encoded = json.encodeToString(group.toBackupDto(emptyList()))
@@ -87,12 +102,14 @@ class BackupSerializationTest {
     }
 
     @Test
-    fun `decode backup without cycle fields restores a group without cycle`() {
-        val legacyGroup = """{"id":1,"person_id":1,"name":"X","scheduled_time":"08:00","medication_ids":[]}"""
+    fun `decode legacy group with cycle fields still decodes gracefully`() {
+        val legacyGroup = """{"id":1,"person_id":1,"name":"X","scheduled_time":"08:00","cycle_active_days":21,"cycle_rest_days":7,"cycle_start_date":"2026-09-01","days_of_week_mask":31,"medication_ids":[10]}"""
 
-        val restored = Json { ignoreUnknownKeys = true }.decodeFromString<MedicationGroupDto>(legacyGroup).toEntity()
+        val decodedDto = Json { ignoreUnknownKeys = true }.decodeFromString<MedicationGroupDto>(legacyGroup)
 
-        assertEquals(0, restored.cycleActiveDays)
-        assertEquals(null, restored.cycleStartDate)
+        assertEquals(21, decodedDto.cycleActiveDays)
+        assertEquals(31, decodedDto.daysOfWeekMask)
+        val entity = decodedDto.toEntity()
+        assertEquals("X", entity.name)
     }
 }

@@ -169,12 +169,44 @@ class MainViewModelTest {
         viewModel.onIntent(
             MainUiIntent.SaveGroup(
                 groupId = 7, personId = 1, name = "Noche", scheduledTime = LocalTime.of(22, 30),
-                ringtoneUriString = null, daysOfWeekMask = 127, medicationIds = emptyList()
+                ringtoneUriString = null, medicationIds = emptyList()
             )
         )
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify { mockGroupDao.saveGroupWithMedicationIds(match { it.lastTakenDate == today }, any()) }
+    }
+
+    @Test
+    fun `saveMedication saves schedule and rest cycle and reschedules all active alarms`() = runTest {
+        viewModel.onIntent(
+            MainUiIntent.SaveMedication(
+                id = 0L,
+                name = "Ibuprofeno",
+                dosage = "400mg",
+                description = "Con comida",
+                daysOfWeekMask = 31, // Mon-Fri
+                cycleActiveDays = 21,
+                cycleRestDays = 7,
+                cycleStartDate = LocalDate.of(2026, 11, 1)
+            )
+        )
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify {
+            mockMedicationDao.upsertMedication(
+                match {
+                    it.name == "Ibuprofeno" &&
+                    it.dosage == "400mg" &&
+                    it.description == "Con comida" &&
+                    it.daysOfWeekMask == 31 &&
+                    it.cycleActiveDays == 21 &&
+                    it.cycleRestDays == 7 &&
+                    it.cycleStartDate == LocalDate.of(2026, 11, 1)
+                }
+            )
+        }
+        coVerify { mockAlarmScheduler.rescheduleAllActive() }
     }
 
     @Test

@@ -139,10 +139,11 @@ class NotificationHelper(private val context: Context) {
         // Updating in place may keep a looping ringtone alive; remove the ringing one first.
         if (silent) cancelNotification(notificationId)
 
-        val medListSummary = if (groupWithMeds.medications.isEmpty()) {
+        val activeMeds = groupWithMeds.activeMedicationsForDate(doseDate)
+        val medListSummary = if (activeMeds.isEmpty()) {
             "Sin medicamentos asignados"
         } else {
-            groupWithMeds.medications.joinToString(", ") {
+            activeMeds.joinToString(", ") {
                 "${it.name}${it.dosage?.let { d -> " ($d)" } ?: ""}"
             }
         }
@@ -217,10 +218,11 @@ class NotificationHelper(private val context: Context) {
         val channelId = getOrCreatePreAlarmChannel()
         val notificationId = group.id.toInt() + 100000
 
-        val medListSummary = if (groupWithMeds.medications.isEmpty()) {
+        val activeMeds = groupWithMeds.activeMedicationsForDate(doseDate)
+        val medListSummary = if (activeMeds.isEmpty()) {
             "Sin medicamentos asignados"
         } else {
-            groupWithMeds.medications.joinToString(", ") {
+            activeMeds.joinToString(", ") {
                 "${it.name}${it.dosage?.let { d -> " ($d)" } ?: ""}"
             }
         }

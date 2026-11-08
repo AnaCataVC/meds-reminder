@@ -27,7 +27,7 @@ data class PersonEntity(
 )
 
 /**
- * Master catalog medication entity. Reusable pill/medicine definition.
+ * Master catalog medication entity. Reusable pill/medicine definition with frequency and rest cycles.
  */
 @Entity(tableName = "medications")
 data class MedicationEntity(
@@ -37,8 +37,35 @@ data class MedicationEntity(
     val dosage: String? = null,
     val description: String? = null,
     @ColumnInfo(name = "created_at_epoch_ms")
-    val createdAtEpochMs: Long = System.currentTimeMillis()
-)
+    val createdAtEpochMs: Long = System.currentTimeMillis(),
+    @ColumnInfo(name = "days_of_week_mask", defaultValue = "127")
+    val daysOfWeekMask: Int = 127, // Bitmask: Mon(1)..Sun(64), 127 = Everyday
+    // Rest cycle (e.g. contraceptives: 21 on / 7 off). 0 active days = no cycle.
+    @ColumnInfo(name = "cycle_active_days", defaultValue = "0")
+    val cycleActiveDays: Int = 0,
+    @ColumnInfo(name = "cycle_rest_days", defaultValue = "0")
+    val cycleRestDays: Int = 0,
+    @ColumnInfo(name = "cycle_start_date")
+    val cycleStartDate: LocalDate? = null
+) {
+    /**
+     * Determines whether this medication is scheduled to be taken on [date].
+     * Evaluates both the weekday bitmask and the active phase of any rest cycle.
+     */
+    fun isActiveOnDate(date: LocalDate): Boolean {
+        // Weekday check
+        val effectiveMask = if (daysOfWeekMask and 127 == 0) 127 else daysOfWeekMask
+        val bit = 1 shl (date.dayOfWeek.value - 1)
+        if ((effectiveMask and bit) == 0) return false
+
+        // Cycle check
+        val start = cycleStartDate ?: return true
+        if (cycleActiveDays <= 0 || cycleRestDays <= 0) return true
+        val cycleLength = cycleActiveDays + cycleRestDays
+        val dayInCycle = Math.floorMod(java.time.temporal.ChronoUnit.DAYS.between(start, date), cycleLength.toLong())
+        return dayInCycle < cycleActiveDays
+    }
+}
 
 /**
  * Medication group entity. Represents a scheduled reminder with an exact time and optional ringtone sound.
@@ -70,8 +97,6 @@ data class MedicationGroupEntity(
     val ringtoneUriString: String? = null,
     @ColumnInfo(name = "is_active")
     val isActive: Boolean = true,
-    @ColumnInfo(name = "days_of_week_mask")
-    val daysOfWeekMask: Int = 127, // Bitmask: Mon(1)..Sun(64), 127 = Everyday
     @ColumnInfo(name = "last_taken_date")
     val lastTakenDate: LocalDate? = null, // Ephemeral day tracking (no log history bloat)
     @ColumnInfo(name = "last_skipped_date", defaultValue = "NULL")
@@ -79,14 +104,7 @@ data class MedicationGroupEntity(
     @ColumnInfo(name = "snooze_until_epoch_ms")
     val snoozeUntilEpochMs: Long? = null,
     @ColumnInfo(name = "advance_notice_minutes", defaultValue = "15")
-    val advanceNoticeMinutes: Int = 15, // 0 = disabled, 15 = 15m before, 30 = 30m before
-    // Rest cycle (e.g. contraceptives: 21 on / 7 off). 0 active days = no cycle.
-    @ColumnInfo(name = "cycle_active_days", defaultValue = "0")
-    val cycleActiveDays: Int = 0,
-    @ColumnInfo(name = "cycle_rest_days", defaultValue = "0")
-    val cycleRestDays: Int = 0,
-    @ColumnInfo(name = "cycle_start_date")
-    val cycleStartDate: LocalDate? = null
+    val advanceNoticeMinutes: Int = 15 // 0 = disabled, 15 = 15m before, 30 = 30m before
 )
 
 /**

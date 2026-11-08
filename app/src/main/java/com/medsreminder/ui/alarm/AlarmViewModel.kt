@@ -89,7 +89,9 @@ class AlarmViewModel(
     }
 
     private fun currentDoseDate(): LocalDate =
-        _uiState.value.groupWithMeds?.group?.let { AndroidAlarmScheduler.currentDoseDate(it) } ?: LocalDate.now()
+        _uiState.value.groupWithMeds?.let {
+            AndroidAlarmScheduler.currentDoseDate(it.group, it.medications)
+        } ?: LocalDate.now()
 
     // Ignores further taps once one action is in flight, so a quick double tap can't run two transitions.
     private fun resolve(action: suspend (groupId: Long) -> Unit) {

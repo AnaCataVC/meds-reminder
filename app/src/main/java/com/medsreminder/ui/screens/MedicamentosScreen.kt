@@ -38,13 +38,17 @@ fun MedicamentosScreen(
                 showAddMedSheet = false
                 medicationToEdit = null
             },
-            onSave = { id, name, dosage, description ->
+            onSave = { id, name, dosage, description, daysMask, cycleActive, cycleRest, cycleStart ->
                 onIntent(
                     MainUiIntent.SaveMedication(
                         id = id,
                         name = name,
                         dosage = dosage,
-                        description = description
+                        description = description,
+                        daysOfWeekMask = daysMask,
+                        cycleActiveDays = cycleActive,
+                        cycleRestDays = cycleRest,
+                        cycleStartDate = cycleStart
                     )
                 )
             }
@@ -224,6 +228,17 @@ fun MedicamentosScreen(
                                                 color = MaterialTheme.colorScheme.outline
                                             )
                                         }
+                                        val freqSummary = remember(med.daysOfWeekMask, med.cycleActiveDays, med.cycleRestDays) {
+                                            formatMedicationSchedule(med)
+                                        }
+                                        if (freqSummary != null) {
+                                            Text(
+                                                text = freqSummary,
+                                                style = MaterialTheme.typography.bodySmall,
+                                                color = MaterialTheme.colorScheme.primary,
+                                                fontWeight = FontWeight.Medium
+                                            )
+                                        }
                                     }
                                 }
 
@@ -250,4 +265,23 @@ fun MedicamentosScreen(
             }
         }
     }
+}
+
+private fun formatMedicationSchedule(med: MedicationEntity): String? {
+    val parts = mutableListOf<String>()
+    if (med.cycleActiveDays > 0 && med.cycleRestDays > 0) {
+        parts.add("Ciclo ${med.cycleActiveDays}/${med.cycleRestDays}")
+    }
+    if (med.daysOfWeekMask != 127) {
+        val daysLabel = when (med.daysOfWeekMask) {
+            31 -> "Lun a Vie"
+            96 -> "Fines de semana"
+            else -> {
+                val names = listOf("L", "M", "M", "J", "V", "S", "D")
+                names.filterIndexed { i, _ -> (med.daysOfWeekMask and (1 shl i)) != 0 }.joinToString(", ")
+            }
+        }
+        parts.add(daysLabel)
+    }
+    return parts.takeIf { it.isNotEmpty() }?.joinToString(" • ")
 }

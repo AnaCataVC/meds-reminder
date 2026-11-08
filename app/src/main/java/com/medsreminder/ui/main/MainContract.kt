@@ -47,7 +47,11 @@ sealed interface MainUiIntent {
         val id: Long = 0,
         val name: String,
         val dosage: String?,
-        val description: String?
+        val description: String?,
+        val daysOfWeekMask: Int = 127,
+        val cycleActiveDays: Int = 0,
+        val cycleRestDays: Int = 0,
+        val cycleStartDate: LocalDate? = null
     ) : MainUiIntent
     data class DeleteMedication(val medication: MedicationEntity) : MainUiIntent
     data class SearchMedications(val query: String) : MainUiIntent
@@ -64,12 +68,8 @@ sealed interface MainUiIntent {
         val name: String,
         val scheduledTime: LocalTime,
         val ringtoneUriString: String?,
-        val daysOfWeekMask: Int,
         val medicationIds: List<Long>,
-        val advanceNoticeMinutes: Int = 15,
-        val cycleActiveDays: Int = 0,
-        val cycleRestDays: Int = 0,
-        val cycleStartDate: LocalDate? = null
+        val advanceNoticeMinutes: Int = 15
     ) : MainUiIntent
     data class DeleteGroup(val groupId: Long) : MainUiIntent
     data class TestAlarm(val groupId: Long) : MainUiIntent

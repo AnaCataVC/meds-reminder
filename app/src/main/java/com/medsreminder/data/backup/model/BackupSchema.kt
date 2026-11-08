@@ -46,7 +46,15 @@ data class MedicationDto(
     val id: Long,
     val name: String,
     val dosage: String? = null,
-    val description: String? = null
+    val description: String? = null,
+    @SerialName("days_of_week_mask")
+    val daysOfWeekMask: Int = 127,
+    @SerialName("cycle_active_days")
+    val cycleActiveDays: Int = 0,
+    @SerialName("cycle_rest_days")
+    val cycleRestDays: Int = 0,
+    @SerialName("cycle_start_date")
+    val cycleStartDate: String? = null // ISO yyyy-MM-dd
 )
 
 @Serializable
@@ -61,16 +69,17 @@ data class MedicationGroupDto(
     val ringtoneUriString: String? = null,
     @SerialName("is_active")
     val isActive: Boolean = true,
-    @SerialName("days_of_week_mask")
-    val daysOfWeekMask: Int = 127,
     @SerialName("advance_notice_minutes")
     val advanceNoticeMinutes: Int = 15,
-    @SerialName("cycle_active_days")
-    val cycleActiveDays: Int = 0,
-    @SerialName("cycle_rest_days")
-    val cycleRestDays: Int = 0,
-    @SerialName("cycle_start_date")
-    val cycleStartDate: String? = null, // ISO yyyy-MM-dd
     @SerialName("medication_ids")
-    val medicationIds: List<Long>
+    val medicationIds: List<Long>,
+    // Optional legacy fields for backwards compatibility with older schema backups
+    @SerialName("days_of_week_mask")
+    val daysOfWeekMask: Int? = null,
+    @SerialName("cycle_active_days")
+    val cycleActiveDays: Int? = null,
+    @SerialName("cycle_rest_days")
+    val cycleRestDays: Int? = null,
+    @SerialName("cycle_start_date")
+    val cycleStartDate: String? = null
 )

@@ -7,15 +7,14 @@ import android.content.Intent
 import android.os.Build
 import android.util.Log
 import com.medsreminder.data.local.dao.MedicationGroupDao
+import com.medsreminder.data.local.entity.MedicationEntity
 import com.medsreminder.data.local.entity.MedicationGroupEntity
 import com.medsreminder.domain.scheduler.AlarmScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.time.DayOfWeek
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.ZoneId
-import java.time.temporal.ChronoUnit
 
 /**
  * Android implementation of AlarmScheduler utilizing AlarmManager.setAlarmClock() for highest reliability.
@@ -27,12 +26,12 @@ class AndroidAlarmScheduler(
 
     private val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
-    override fun schedule(group: MedicationGroupEntity) {
+    override fun schedule(group: MedicationGroupEntity, medications: List<MedicationEntity>) {
         if (!group.isActive) {
             cancel(group)
             return
         }
-        val triggerEpochMs = calculateNextTriggerTime(group)
+        val triggerEpochMs = calculateNextTriggerTime(group, medications)
         setExactAlarmClock(group.id, triggerEpochMs)
 
         // Schedule silent pre-alarm if enabled and not currently snoozed
@@ -68,7 +67,7 @@ class AndroidAlarmScheduler(
         val activeGroups = groupDao.getAllActiveGroupsSync()
         for (item in activeGroups) {
             // One failing group must not leave the remaining groups unscheduled.
-            runCatching { schedule(item.group) }
+            runCatching { schedule(item.group, item.medications) }
                 .onFailure { Log.e(TAG, "Failed to schedule groupId=${item.group.id}", it) }
         }
     }
@@ -162,6 +161,7 @@ class AndroidAlarmScheduler(
      */
     fun calculateNextTriggerTime(
         group: MedicationGroupEntity,
+        medications: List<MedicationEntity> = emptyList(),
         referenceNow: LocalDateTime = LocalDateTime.now()
     ): Long {
         val referenceNowEpochMs = referenceNow.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -180,9 +180,11 @@ class AndroidAlarmScheduler(
             targetDateTime = targetDateTime.plusDays(1)
         }
 
-        // Loop forward until we find an enabled day of the week
-        while (!isDayEnabled(group, targetDateTime.toLocalDate())) {
+        // Loop forward until we find an enabled day where at least one medication is active
+        var safetyCounter = 0
+        while (!isDayEnabled(medications, targetDateTime.toLocalDate()) && safetyCounter < 366) {
             targetDateTime = targetDateTime.plusDays(1)
+            safetyCounter++
         }
 
         return targetDateTime.atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
@@ -199,36 +201,32 @@ class AndroidAlarmScheduler(
          */
         fun currentDoseDate(
             group: MedicationGroupEntity,
+            medications: List<MedicationEntity> = emptyList(),
             referenceNow: LocalDateTime = LocalDateTime.now()
         ): LocalDate {
             var candidate = referenceNow.toLocalDate()
             if (candidate.atTime(group.scheduledTime).isAfter(referenceNow)) {
                 candidate = candidate.minusDays(1)
             }
-            while (!isDayEnabled(group, candidate)) {
+            var safetyCounter = 0
+            while (!isDayEnabled(medications, candidate) && safetyCounter < 366) {
                 candidate = candidate.minusDays(1)
+                safetyCounter++
             }
             return candidate
         }
 
-        /** A dose is due on [date] when its weekday is enabled and it falls in the active phase of the rest cycle. */
-        fun isDayEnabled(group: MedicationGroupEntity, date: LocalDate): Boolean =
-            isWeekdayEnabled(date.dayOfWeek, group.daysOfWeekMask) && isInActivePhase(group, date)
-
-        // An incomplete cycle config counts as "no cycle", so a bad row can never block every day.
-        fun isInActivePhase(group: MedicationGroupEntity, date: LocalDate): Boolean {
-            val start = group.cycleStartDate ?: return true
-            if (group.cycleActiveDays <= 0 || group.cycleRestDays <= 0) return true
-            val cycleLength = group.cycleActiveDays + group.cycleRestDays
-            val dayInCycle = Math.floorMod(ChronoUnit.DAYS.between(start, date), cycleLength.toLong())
-            return dayInCycle < group.cycleActiveDays
+        /**
+         * A group dose is enabled on [date] when it has no medications assigned (default active)
+         * or when at least one of its assigned medications is active on [date].
+         */
+        fun isDayEnabled(medications: List<MedicationEntity>, date: LocalDate): Boolean {
+            if (medications.isEmpty()) return true
+            return medications.any { it.isActiveOnDate(date) }
         }
 
-        // An empty mask would never match any day; treat it as "every day" instead of looping forever.
-        private fun isWeekdayEnabled(dayOfWeek: DayOfWeek, mask: Int): Boolean {
-            val effectiveMask = if (mask and 127 == 0) 127 else mask
-            val bit = 1 shl (dayOfWeek.value - 1)
-            return (effectiveMask and bit) != 0
-        }
+        /** Checks if a specific medication is scheduled on [date]. */
+        fun isMedicationActiveOnDate(medication: MedicationEntity, date: LocalDate): Boolean =
+            medication.isActiveOnDate(date)
     }
 }

@@ -357,15 +357,16 @@ private fun HorarioReminderCard(
     val today = remember { LocalDate.now() }
     val isTakenToday = group.lastTakenDate == today
     val isSkippedToday = group.lastSkippedDate == today
-    val isRestDay = !AndroidAlarmScheduler.isInActivePhase(group, today)
+    val activeMedsToday = remember(groupWithMeds, today) { groupWithMeds.activeMedicationsForDate(today) }
+    val isRestDay = groupWithMeds.medications.isNotEmpty() && activeMedsToday.isEmpty()
     val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > System.currentTimeMillis()
     val crossRefMap = remember(groupWithMeds.crossRefs) { groupWithMeds.crossRefs.associateBy { it.medicationId } }
-    val totalMeds = groupWithMeds.medications.size
-    val takenMedsCount = remember(crossRefMap, today, groupWithMeds.medications) {
-        groupWithMeds.medications.count { med -> crossRefMap[med.id]?.lastTakenDate == today }
+    val totalMeds = activeMedsToday.size
+    val takenMedsCount = remember(crossRefMap, today, activeMedsToday) {
+        activeMedsToday.count { med -> crossRefMap[med.id]?.lastTakenDate == today }
     }
-    val skippedMedsCount = remember(crossRefMap, today, groupWithMeds.medications) {
-        groupWithMeds.medications.count { med -> crossRefMap[med.id]?.lastSkippedDate == today }
+    val skippedMedsCount = remember(crossRefMap, today, activeMedsToday) {
+        activeMedsToday.count { med -> crossRefMap[med.id]?.lastSkippedDate == today }
     }
     val isPartialToday = isTakenToday && totalMeds >= 2 && takenMedsCount in 1 until totalMeds
     val snoozeFormatted = remember(group.snoozeUntilEpochMs) {
@@ -537,12 +538,12 @@ private fun HorarioReminderCard(
             Spacer(modifier = Modifier.height(10.dp))
 
             // Pills chips list
-            if (groupWithMeds.medications.isNotEmpty()) {
+            if (activeMedsToday.isNotEmpty()) {
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    groupWithMeds.medications.forEach { med ->
+                    activeMedsToday.forEach { med ->
                         val isMedTaken = crossRefMap[med.id]?.lastTakenDate == today
                         val isMedSkipped = crossRefMap[med.id]?.lastSkippedDate == today
                         SuggestionChip(
@@ -567,6 +568,12 @@ private fun HorarioReminderCard(
                         )
                     }
                 }
+            } else if (isRestDay) {
+                Text(
+                    text = "Día de descanso para los medicamentos de este horario",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
             } else {
                 Text(
                     text = "No hay medicamentos en este horario (Toca para editar)",
@@ -619,7 +626,7 @@ private fun HorarioReminderCard(
                             .fillMaxHeight(),
                         shape = RoundedCornerShape(topStart = 10.dp, bottomStart = 10.dp, topEnd = 0.dp, bottomEnd = 0.dp),
                         contentPadding = PaddingValues(horizontal = 6.dp, vertical = 0.dp),
-                        enabled = !isTakenToday && !isSkippedToday,
+                        enabled = !isTakenToday && !isSkippedToday && !isRestDay,
                         colors = if (isSnoozed) {
                             ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.tertiary
@@ -650,7 +657,7 @@ private fun HorarioReminderCard(
                             .fillMaxHeight(),
                         shape = RoundedCornerShape(topStart = 0.dp, bottomStart = 0.dp, topEnd = 10.dp, bottomEnd = 10.dp),
                         contentPadding = PaddingValues(0.dp),
-                        enabled = !isTakenToday && !isSkippedToday,
+                        enabled = !isTakenToday && !isSkippedToday && !isRestDay,
                         colors = if (isSnoozed) {
                             ButtonDefaults.outlinedButtonColors(
                                 contentColor = MaterialTheme.colorScheme.tertiary
@@ -698,7 +705,7 @@ private fun HorarioReminderCard(
                 } else {
                     Button(
                         onClick = onConfirmToday,
-                        enabled = !isTakenToday,
+                        enabled = !isTakenToday && !isRestDay,
                         modifier = Modifier
                             .weight(1.3f)
                             .fillMaxHeight(),

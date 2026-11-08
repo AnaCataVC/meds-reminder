@@ -47,8 +47,7 @@ class AlarmViewModelTest {
         id = 10L,
         personId = 1L,
         name = "Matutino",
-        scheduledTime = LocalTime.of(8, 0),
-        daysOfWeekMask = 127
+        scheduledTime = LocalTime.of(8, 0)
     )
     private val sampleGroupWithMeds = MedicationGroupWithMedications(
         group = sampleGroup,

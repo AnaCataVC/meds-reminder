@@ -54,7 +54,7 @@ object WidgetScheduleResolver {
                 val group = item.group
                 group.isActive &&
                         (targetPersonId == null || group.personId == targetPersonId) &&
-                        AndroidAlarmScheduler.isDayEnabled(group, today)
+                        AndroidAlarmScheduler.isDayEnabled(item.medications, today)
             }
             .map { item ->
                 val group = item.group
@@ -64,9 +64,10 @@ object WidgetScheduleResolver {
                 val isSnoozed = group.snoozeUntilEpochMs != null && group.snoozeUntilEpochMs > referenceNowEpochMs
                 val isSuspended = person?.suspendedUntilEpochMs?.let { it > referenceNowEpochMs } ?: false
 
+                val activeMeds = item.activeMedicationsForDate(today)
                 val crossRefMap = item.crossRefs.associateBy { it.medicationId }
-                val totalCount = item.medications.size
-                val takenCount = item.medications.count { med -> crossRefMap[med.id]?.lastTakenDate?.let { !it.isBefore(today) } == true }
+                val totalCount = activeMeds.size
+                val takenCount = activeMeds.count { med -> crossRefMap[med.id]?.lastTakenDate?.let { !it.isBefore(today) } == true }
                 val isPartialToday = isTakenToday && totalCount >= 2 && takenCount in 1 until totalCount
 
                 WidgetScheduleItem(
@@ -76,7 +77,7 @@ object WidgetScheduleResolver {
                     personColorHex = person?.colorHex ?: "#0061A4",
                     groupName = group.name,
                     scheduledTime = group.scheduledTime,
-                    medications = item.medications.map { it.name },
+                    medications = activeMeds.map { it.name },
                     isTakenToday = isTakenToday,
                     isSkippedToday = isSkippedToday,
                     isPartialToday = isPartialToday,

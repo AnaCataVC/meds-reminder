@@ -29,7 +29,7 @@ class MedicationScheduleRepositoryImpl(
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
             val updatedGroup = groupWithMeds.group.copy(lastTakenDate = date, lastSkippedDate = null, snoozeUntilEpochMs = null)
-            alarmScheduler.schedule(updatedGroup)
+            alarmScheduler.schedule(updatedGroup, groupWithMeds.medications)
         }
         widgetUpdater?.notifyWidgetsChanged()
     }
@@ -48,7 +48,7 @@ class MedicationScheduleRepositoryImpl(
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
             val updatedGroup = groupWithMeds.group.copy(lastTakenDate = date, lastSkippedDate = null, snoozeUntilEpochMs = null)
-            alarmScheduler.schedule(updatedGroup)
+            alarmScheduler.schedule(updatedGroup, groupWithMeds.medications)
         }
         widgetUpdater?.notifyWidgetsChanged()
     }
@@ -69,7 +69,7 @@ class MedicationScheduleRepositoryImpl(
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
             val updatedGroup = groupWithMeds.group.copy(snoozeUntilEpochMs = null)
-            alarmScheduler.schedule(updatedGroup)
+            alarmScheduler.schedule(updatedGroup, groupWithMeds.medications)
         }
         widgetUpdater?.notifyWidgetsChanged()
     }
@@ -83,7 +83,7 @@ class MedicationScheduleRepositoryImpl(
         val groupWithMeds = groupDao.getGroupById(groupId)
         if (groupWithMeds != null) {
             val updatedGroup = groupWithMeds.group.copy(lastSkippedDate = date, lastTakenDate = null, snoozeUntilEpochMs = null)
-            alarmScheduler.schedule(updatedGroup)
+            alarmScheduler.schedule(updatedGroup, groupWithMeds.medications)
         }
         widgetUpdater?.notifyWidgetsChanged()
     }
@@ -104,7 +104,7 @@ class MedicationScheduleRepositoryImpl(
                 groupDao.setSnoozeTime(groupId, triggerEpoch)
                 alarmScheduler.scheduleSnooze(groupId, triggerEpoch)
             } else {
-                alarmScheduler.schedule(updatedGroup)
+                alarmScheduler.schedule(updatedGroup, groupWithMeds.medications)
             }
         }
         widgetUpdater?.notifyWidgetsChanged()

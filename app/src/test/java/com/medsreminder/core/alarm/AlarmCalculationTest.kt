@@ -1,6 +1,7 @@
 package com.medsreminder.core.alarm
 
 import com.medsreminder.data.local.dao.MedicationGroupDao
+import com.medsreminder.data.local.entity.MedicationEntity
 import com.medsreminder.data.local.entity.MedicationGroupEntity
 import io.mockk.mockk
 import org.junit.Assert.assertEquals
@@ -29,11 +30,11 @@ class AlarmCalculationTest {
             id = 1,
             personId = 1,
             name = "Afternoon Dose",
-            scheduledTime = targetTime,
-            daysOfWeekMask = 127 // Everyday
+            scheduledTime = targetTime
         )
+        val med = MedicationEntity(id = 10, name = "Med", daysOfWeekMask = 127)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         val expectedEpoch = LocalDateTime.of(2026, 8, 17, 14, 30)
             .atZone(ZoneId.systemDefault())
             .toInstant()
@@ -51,11 +52,11 @@ class AlarmCalculationTest {
             id = 1,
             personId = 1,
             name = "Morning Dose",
-            scheduledTime = targetTime,
-            daysOfWeekMask = 127 // Everyday
+            scheduledTime = targetTime
         )
+        val med = MedicationEntity(id = 10, name = "Med", daysOfWeekMask = 127)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         val expectedEpoch = LocalDateTime.of(2026, 8, 18, 8, 0)
             .atZone(ZoneId.systemDefault())
             .toInstant()
@@ -74,11 +75,11 @@ class AlarmCalculationTest {
             personId = 1,
             name = "Afternoon Dose",
             scheduledTime = targetTime,
-            daysOfWeekMask = 127,
             advanceNoticeMinutes = 15
         )
+        val med = MedicationEntity(id = 10, name = "Med", daysOfWeekMask = 127)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         val preAlarmEpoch = triggerEpoch - (group.advanceNoticeMinutes * 60 * 1000L)
 
         val expectedPreAlarmEpoch = LocalDateTime.of(2026, 8, 17, 13, 45)
@@ -99,12 +100,11 @@ class AlarmCalculationTest {
             personId = 1,
             name = "Afternoon Dose",
             scheduledTime = targetTime,
-            daysOfWeekMask = 127, // Everyday
-            lastTakenDate = java.time.LocalDate.of(2026, 8, 17) // Already taken today!
+            lastTakenDate = LocalDate.of(2026, 8, 17) // Already taken today!
         )
+        val med = MedicationEntity(id = 10, name = "Med", daysOfWeekMask = 127)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
-        // Must be scheduled for tomorrow (2026-08-18 14:00), not today
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         val expectedEpoch = LocalDateTime.of(2026, 8, 18, 14, 0)
             .atZone(ZoneId.systemDefault())
             .toInstant()
@@ -114,8 +114,8 @@ class AlarmCalculationTest {
     }
 
     @Test
-    fun `calculateNextTriggerTime respects dayOfWeek mask when taken today on selective days`() {
-        // Reference time is Monday morning (2026-08-17). Group is only scheduled for Mon(1), Wed(4) -> mask = 1 + 4 = 5
+    fun `calculateNextTriggerTime respects medication dayOfWeek mask when taken today on selective days`() {
+        // Reference time is Monday morning (2026-08-17). Med is only scheduled for Mon(1), Wed(4) -> mask = 5
         val referenceNow = LocalDateTime.of(2026, 8, 17, 9, 0)
         val targetTime = LocalTime.of(12, 0)
         val monWedMask = 1 or (1 shl (java.time.DayOfWeek.WEDNESDAY.value - 1))
@@ -124,13 +124,50 @@ class AlarmCalculationTest {
             personId = 1,
             name = "Mon-Wed Dose",
             scheduledTime = targetTime,
-            daysOfWeekMask = monWedMask,
-            lastTakenDate = java.time.LocalDate.of(2026, 8, 17) // Taken Monday early
+            lastTakenDate = LocalDate.of(2026, 8, 17) // Taken Monday early
         )
+        val med = MedicationEntity(id = 10, name = "Mon-Wed Med", daysOfWeekMask = monWedMask)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         // Next occurrence should be Wednesday (2026-08-19 12:00)
         val expectedEpoch = LocalDateTime.of(2026, 8, 19, 12, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(expectedEpoch, triggerEpoch)
+    }
+
+    @Test
+    fun `calculateNextTriggerTime skips weekends when medication is weekday-only (Mon-Fri)`() {
+        // Reference time is Friday evening (2026-08-21 20:00). Group is at 08:00 AM.
+        val referenceNow = LocalDateTime.of(2026, 8, 21, 20, 0)
+        val group = MedicationGroupEntity(id = 1, personId = 1, name = "Weekday Group", scheduledTime = LocalTime.of(8, 0))
+        val weekdayMed = MedicationEntity(id = 10, name = "Workday Pill", daysOfWeekMask = 31) // Mon..Fri
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(weekdayMed), referenceNow)
+        // Next occurrence must skip Saturday (22) and Sunday (23) -> Monday 2026-08-24 08:00 AM
+        val expectedEpoch = LocalDateTime.of(2026, 8, 24, 8, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        assertEquals(expectedEpoch, triggerEpoch)
+    }
+
+    @Test
+    fun `group with mixed medications triggers on day where any medication is active`() {
+        // Reference time is Friday evening (2026-08-21 20:00). Group at 08:00 AM.
+        // Med A: Mon-Fri (31)
+        // Med B: Weekend-only (96)
+        val referenceNow = LocalDateTime.of(2026, 8, 21, 20, 0)
+        val group = MedicationGroupEntity(id = 1, personId = 1, name = "Daily Group", scheduledTime = LocalTime.of(8, 0))
+        val weekdayMed = MedicationEntity(id = 10, name = "Weekday Pill", daysOfWeekMask = 31)
+        val weekendMed = MedicationEntity(id = 11, name = "Weekend Vitamin", daysOfWeekMask = 96)
+
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(weekdayMed, weekendMed), referenceNow)
+        // Saturday morning (2026-08-22 08:00 AM) is enabled because Weekend Vitamin is active!
+        val expectedEpoch = LocalDateTime.of(2026, 8, 22, 8, 0)
             .atZone(ZoneId.systemDefault())
             .toInstant()
             .toEpochMilli()
@@ -148,11 +185,11 @@ class AlarmCalculationTest {
             personId = 1,
             name = "Mon-Wed Dose",
             scheduledTime = targetTime,
-            daysOfWeekMask = monWedMask,
-            lastSkippedDate = java.time.LocalDate.of(2026, 8, 17) // Skipped Monday
+            lastSkippedDate = LocalDate.of(2026, 8, 17) // Skipped Monday
         )
+        val med = MedicationEntity(id = 10, name = "Mon-Wed Med", daysOfWeekMask = monWedMask)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         // Next occurrence should be Wednesday (2026-08-19 12:00)
         val expectedEpoch = LocalDateTime.of(2026, 8, 19, 12, 0)
             .atZone(ZoneId.systemDefault())
@@ -173,11 +210,11 @@ class AlarmCalculationTest {
             personId = 1,
             name = "Snoozed Medication",
             scheduledTime = LocalTime.of(8, 0),
-            daysOfWeekMask = 127,
             snoozeUntilEpochMs = snoozeEpoch
         )
+        val med = MedicationEntity(id = 10, name = "Med", daysOfWeekMask = 127)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         assertEquals(snoozeEpoch, triggerEpoch)
     }
 
@@ -192,11 +229,11 @@ class AlarmCalculationTest {
             personId = 1,
             name = "Expired Snooze Medication",
             scheduledTime = LocalTime.of(8, 0),
-            daysOfWeekMask = 127,
             snoozeUntilEpochMs = expiredSnoozeEpoch
         )
+        val med = MedicationEntity(id = 10, name = "Med", daysOfWeekMask = 127)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
         val expectedTomorrowEpoch = LocalDateTime.of(2026, 8, 18, 8, 0)
             .atZone(ZoneId.systemDefault())
             .toInstant()
@@ -209,10 +246,11 @@ class AlarmCalculationTest {
     fun `calculateNextTriggerTime treats empty days mask as every day instead of looping`() {
         val referenceNow = LocalDateTime.of(2026, 8, 17, 8, 0)
         val group = MedicationGroupEntity(
-            id = 1, personId = 1, name = "No days", scheduledTime = LocalTime.of(9, 0), daysOfWeekMask = 0
+            id = 1, personId = 1, name = "No days", scheduledTime = LocalTime.of(9, 0)
         )
+        val med = MedicationEntity(id = 10, name = "Empty mask", daysOfWeekMask = 0)
 
-        val triggerEpoch = scheduler.calculateNextTriggerTime(group, referenceNow)
+        val triggerEpoch = scheduler.calculateNextTriggerTime(group, listOf(med), referenceNow)
 
         val expected = LocalDateTime.of(2026, 8, 17, 9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals(expected, triggerEpoch)
@@ -222,8 +260,9 @@ class AlarmCalculationTest {
     fun `currentDoseDate keeps a dose answered after midnight on its scheduled day`() {
         // 22:00 dose postponed and answered at 04:00 the next morning
         val group = MedicationGroupEntity(id = 1, personId = 1, name = "Noche", scheduledTime = LocalTime.of(22, 0))
+        val med = MedicationEntity(id = 10, name = "Med", daysOfWeekMask = 127)
 
-        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, LocalDateTime.of(2026, 8, 18, 4, 0))
+        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, listOf(med), LocalDateTime.of(2026, 8, 18, 4, 0))
 
         assertEquals(LocalDate.of(2026, 8, 17), doseDate)
     }
@@ -232,36 +271,43 @@ class AlarmCalculationTest {
     fun `currentDoseDate skips back over disabled days`() {
         // Monday-only dose (bit 1), asked on Wednesday
         val group = MedicationGroupEntity(
-            id = 1, personId = 1, name = "Lunes", scheduledTime = LocalTime.of(8, 0), daysOfWeekMask = 1
+            id = 1, personId = 1, name = "Lunes", scheduledTime = LocalTime.of(8, 0)
         )
+        val med = MedicationEntity(id = 10, name = "Mon Med", daysOfWeekMask = 1)
 
-        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, LocalDateTime.of(2026, 8, 19, 10, 0))
+        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, listOf(med), LocalDateTime.of(2026, 8, 19, 10, 0))
 
         assertEquals(LocalDate.of(2026, 8, 17), doseDate)
     }
 
     @Test
-    fun `calculateNextTriggerTime skips the rest phase of a cycle`() {
+    fun `calculateNextTriggerTime skips the rest phase of a medication cycle`() {
         // 21 on / 7 off starting Monday 2026-08-03: day 21 (2026-08-24) is the first rest day
         val group = MedicationGroupEntity(
-            id = 1, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(9, 0),
+            id = 1, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(9, 0)
+        )
+        val cyclicMed = MedicationEntity(
+            id = 10, name = "Pill 21/7",
             cycleActiveDays = 21, cycleRestDays = 7, cycleStartDate = LocalDate.of(2026, 8, 3)
         )
 
-        val trigger = scheduler.calculateNextTriggerTime(group, LocalDateTime.of(2026, 8, 23, 10, 0))
+        val trigger = scheduler.calculateNextTriggerTime(group, listOf(cyclicMed), LocalDateTime.of(2026, 8, 23, 10, 0))
 
         val expected = LocalDateTime.of(2026, 8, 31, 9, 0).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
         assertEquals(expected, trigger)
     }
 
     @Test
-    fun `currentDoseDate skips back over rest days`() {
+    fun `currentDoseDate skips back over medication rest days`() {
         val group = MedicationGroupEntity(
-            id = 1, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(9, 0),
+            id = 1, personId = 1, name = "Anticonceptivo", scheduledTime = LocalTime.of(9, 0)
+        )
+        val cyclicMed = MedicationEntity(
+            id = 10, name = "Pill 21/7",
             cycleActiveDays = 21, cycleRestDays = 7, cycleStartDate = LocalDate.of(2026, 8, 3)
         )
 
-        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, LocalDateTime.of(2026, 8, 27, 10, 0))
+        val doseDate = AndroidAlarmScheduler.currentDoseDate(group, listOf(cyclicMed), LocalDateTime.of(2026, 8, 27, 10, 0))
 
         assertEquals(LocalDate.of(2026, 8, 23), doseDate)
     }

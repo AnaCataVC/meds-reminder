@@ -58,8 +58,18 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                     val doseDate = if (action == ACTION_PRE_ALARM) {
                         LocalDateTime.now().plusMinutes(group.advanceNoticeMinutes.toLong()).toLocalDate()
                     } else {
-                        AndroidAlarmScheduler.currentDoseDate(group)
+                        AndroidAlarmScheduler.currentDoseDate(group, groupWithMeds.medications)
                     }
+
+                    // If the group has medications configured but none are active on doseDate, reschedule and skip
+                    val activeMeds = groupWithMeds.activeMedicationsForDate(doseDate)
+                    if (groupWithMeds.medications.isNotEmpty() && activeMeds.isEmpty()) {
+                        if (action == ACTION_FIRE_ALARM) {
+                            alarmScheduler.schedule(groupWithMeds.group, groupWithMeds.medications)
+                        }
+                        return@launch
+                    }
+
                     val isAlreadyTakenToday = group.lastTakenDate?.let { !it.isBefore(doseDate) } == true
                     val isAlreadySkippedToday = group.lastSkippedDate?.let { !it.isBefore(doseDate) } == true
                     val isAlreadyResolvedToday = isAlreadyTakenToday || isAlreadySkippedToday
@@ -69,7 +79,7 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                     if (isPersonSuspended || isAlreadyResolvedToday) {
                         if (action == ACTION_FIRE_ALARM) {
                             // Automatically reschedule for tomorrow / next active day
-                            alarmScheduler.schedule(groupWithMeds.group)
+                            alarmScheduler.schedule(groupWithMeds.group, groupWithMeds.medications)
                         }
                         return@launch
                     }
@@ -98,10 +108,11 @@ class AlarmReceiver : BroadcastReceiver(), KoinComponent {
                         // Fallback reschedule: if the user ignores the notification, ensure the next
                         // regular calendar occurrence is queued. Any active future snooze takes precedence
                         // and prevents clobbering.
-                        val freshGroup = groupDao.getGroupById(groupId)?.group ?: groupWithMeds.group
+                        val freshGroupWithMeds = groupDao.getGroupById(groupId) ?: groupWithMeds
+                        val freshGroup = freshGroupWithMeds.group
                         val hasActiveSnooze = freshGroup.snoozeUntilEpochMs?.let { it > System.currentTimeMillis() } == true
                         if (!hasActiveSnooze) {
-                            alarmScheduler.schedule(freshGroup)
+                            alarmScheduler.schedule(freshGroup, freshGroupWithMeds.medications)
                         }
                     } else if (action == ACTION_PRE_ALARM) {
                         notificationHelper.showPreAlarmNotification(

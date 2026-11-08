@@ -75,25 +75,9 @@ fun AddEditGroupScreen(
     val ringtoneTitle = remember(ringtoneUriString) {
         ringtoneTitle(context, ringtoneUriString, nullLabel = "Usar el sonido de la persona")
     }
-    var daysOfWeekMask by remember(existingGroup) {
-        mutableStateOf(existingGroup?.group?.daysOfWeekMask ?: 127)
-    }
     var advanceNoticeMinutes by remember(existingGroup) {
         mutableStateOf(existingGroup?.group?.advanceNoticeMinutes ?: 15)
     }
-    var cycleEnabled by remember(existingGroup) {
-        mutableStateOf((existingGroup?.group?.cycleActiveDays ?: 0) > 0)
-    }
-    var cycleActiveDaysText by remember(existingGroup) {
-        mutableStateOf(existingGroup?.group?.cycleActiveDays?.takeIf { it > 0 }?.toString() ?: "21")
-    }
-    var cycleRestDaysText by remember(existingGroup) {
-        mutableStateOf(existingGroup?.group?.cycleRestDays?.takeIf { it > 0 }?.toString() ?: "7")
-    }
-    var cycleStartDate by remember(existingGroup) {
-        mutableStateOf(existingGroup?.group?.cycleStartDate ?: LocalDate.now())
-    }
-    var showCycleDatePicker by remember { mutableStateOf(false) }
     var selectedMedicationIds by remember(existingGroup) {
         mutableStateOf(existingGroup?.medications?.map { it.id }?.toSet() ?: emptySet())
     }
@@ -124,8 +108,18 @@ fun AddEditGroupScreen(
     if (showInlineMedSheet) {
         AddEditMedicationSheet(
             onDismiss = { showInlineMedSheet = false },
-            onSave = { _, mName, dosage, desc ->
-                onIntent(MainUiIntent.SaveMedication(name = mName, dosage = dosage, description = desc))
+            onSave = { _, mName, dosage, desc, daysMask, cycleActive, cycleRest, cycleStart ->
+                onIntent(
+                    MainUiIntent.SaveMedication(
+                        name = mName,
+                        dosage = dosage,
+                        description = desc,
+                        daysOfWeekMask = daysMask,
+                        cycleActiveDays = cycleActive,
+                        cycleRestDays = cycleRest,
+                        cycleStartDate = cycleStart
+                    )
+                )
             }
         )
     }
@@ -516,129 +510,12 @@ fun AddEditGroupScreen(
                 }
             }
 
-            // 7. Días de la Semana
-            Column {
-                Text(
-                    text = "7. Días de repetición",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-
-                val days = listOf(
-                    Triple("L", DayOfWeek.MONDAY, 1),
-                    Triple("M", DayOfWeek.TUESDAY, 2),
-                    Triple("M", DayOfWeek.WEDNESDAY, 4),
-                    Triple("J", DayOfWeek.THURSDAY, 8),
-                    Triple("V", DayOfWeek.FRIDAY, 16),
-                    Triple("S", DayOfWeek.SATURDAY, 32),
-                    Triple("D", DayOfWeek.SUNDAY, 64)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    days.forEach { (label, _, bit) ->
-                        val isEnabled = (daysOfWeekMask and bit) != 0
-                        Surface(
-                            shape = CircleShape,
-                            color = if (isEnabled) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
-                            modifier = Modifier
-                                .size(40.dp)
-                                .clickable {
-                                    daysOfWeekMask = if (isEnabled) {
-                                        daysOfWeekMask and bit.inv()
-                                    } else {
-                                        daysOfWeekMask or bit
-                                    }
-                                }
-                        ) {
-                            Box(contentAlignment = Alignment.Center) {
-                                Text(
-                                    text = label,
-                                    color = if (isEnabled) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-
-            // 8. Ciclo de descanso
-            Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "8. Ciclo de descanso",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold
-                        )
-                        Text(
-                            text = "Toma durante unos días y descansa otros (por ejemplo, anticonceptivos 21/7).",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline
-                        )
-                    }
-                    Switch(checked = cycleEnabled, onCheckedChange = { cycleEnabled = it })
-                }
-                if (cycleEnabled) {
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        OutlinedTextField(
-                            value = cycleActiveDaysText,
-                            onValueChange = { cycleActiveDaysText = it.filter(Char::isDigit).take(3) },
-                            label = { Text("Días de toma") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f)
-                        )
-                        OutlinedTextField(
-                            value = cycleRestDaysText,
-                            onValueChange = { cycleRestDaysText = it.filter(Char::isDigit).take(3) },
-                            label = { Text("Días de descanso") },
-                            singleLine = true,
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(8.dp))
-                    OutlinedButton(onClick = { showCycleDatePicker = true }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Inicio del ciclo: ${cycleStartDate.format(DateTimeFormatter.ofPattern("dd/MM/yyyy"))}")
-                    }
-                }
-            }
-
-            if (showCycleDatePicker) {
-                val datePickerState = rememberDatePickerState(
-                    initialSelectedDateMillis = cycleStartDate.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
-                )
-                DatePickerDialog(
-                    onDismissRequest = { showCycleDatePicker = false },
-                    confirmButton = {
-                        TextButton(onClick = {
-                            // DatePicker reports the selected day as UTC midnight.
-                            datePickerState.selectedDateMillis?.let {
-                                cycleStartDate = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate()
-                            }
-                            showCycleDatePicker = false
-                        }) { Text("Aceptar") }
-                    },
-                    dismissButton = { TextButton(onClick = { showCycleDatePicker = false }) { Text("Cancelar") } }
-                ) { DatePicker(state = datePickerState) }
-            }
-
             Spacer(modifier = Modifier.height(10.dp))
 
             // Save Button
             val isNameMissing = name.isBlank()
             val isPersonMissing = selectedPersonId == 0L
-            val cycleActiveDays = cycleActiveDaysText.toIntOrNull() ?: 0
-            val cycleRestDays = cycleRestDaysText.toIntOrNull() ?: 0
-            val isCycleInvalid = cycleEnabled && (cycleActiveDays <= 0 || cycleRestDays <= 0)
-            val canSave = !isNameMissing && !isPersonMissing && !isCycleInvalid
+            val canSave = !isNameMissing && !isPersonMissing
 
             Button(
                 onClick = {
@@ -649,12 +526,8 @@ fun AddEditGroupScreen(
                             name = name,
                             scheduledTime = scheduledTime,
                             ringtoneUriString = ringtoneUriString,
-                            daysOfWeekMask = if (daysOfWeekMask == 0) 127 else daysOfWeekMask,
                             medicationIds = selectedMedicationIds.toList(),
-                            advanceNoticeMinutes = advanceNoticeMinutes,
-                            cycleActiveDays = if (cycleEnabled) cycleActiveDays else 0,
-                            cycleRestDays = if (cycleEnabled) cycleRestDays else 0,
-                            cycleStartDate = if (cycleEnabled) cycleStartDate else null
+                            advanceNoticeMinutes = advanceNoticeMinutes
                         )
                     )
                 },

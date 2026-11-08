@@ -25,4 +25,10 @@ data class MedicationGroupWithMedications(
         entityColumn = "group_id"
     )
     val crossRefs: List<MedicationGroupCrossRef> = emptyList()
-)
+) {
+    /**
+     * Filters medications assigned to this group that are scheduled to be taken on [date].
+     */
+    fun activeMedicationsForDate(date: java.time.LocalDate): List<MedicationEntity> =
+        medications.filter { it.isActiveOnDate(date) }
+}

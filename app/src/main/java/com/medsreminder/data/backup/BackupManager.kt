@@ -63,7 +63,11 @@ class BackupManager(
                     id = it.id,
                     name = it.name,
                     dosage = it.dosage,
-                    description = it.description
+                    description = it.description,
+                    daysOfWeekMask = it.daysOfWeekMask,
+                    cycleActiveDays = it.cycleActiveDays,
+                    cycleRestDays = it.cycleRestDays,
+                    cycleStartDate = it.cycleStartDate?.toString()
                 )
             }
 
@@ -121,14 +125,50 @@ class BackupManager(
                     )
                 }
 
+                // Map legacy group schedules if restoring from an older backup format
+                val legacyGroupScheduleByMedId = mutableMapOf<Long, Pair<Int?, Triple<Int, Int, String?>?>>()
+                for (gDto in envelope.payload.medicationGroups) {
+                    val groupMask = gDto.daysOfWeekMask
+                    val groupCycle = if ((gDto.cycleActiveDays ?: 0) > 0) {
+                        Triple(gDto.cycleActiveDays ?: 0, gDto.cycleRestDays ?: 0, gDto.cycleStartDate)
+                    } else null
+                    if (groupMask != null || groupCycle != null) {
+                        for (medId in gDto.medicationIds) {
+                            legacyGroupScheduleByMedId[medId] = Pair(groupMask, groupCycle)
+                        }
+                    }
+                }
+
                 // Insert Medications
                 for (mDto in envelope.payload.medications) {
+                    val legacyInfo = legacyGroupScheduleByMedId[mDto.id]
+                    val effectiveMask = if (mDto.daysOfWeekMask != 127) {
+                        mDto.daysOfWeekMask
+                    } else {
+                        legacyInfo?.first ?: mDto.daysOfWeekMask
+                    }
+                    val effectiveCycleActive = if (mDto.cycleActiveDays != 0) {
+                        mDto.cycleActiveDays
+                    } else {
+                        legacyInfo?.second?.first ?: mDto.cycleActiveDays
+                    }
+                    val effectiveCycleRest = if (mDto.cycleRestDays != 0) {
+                        mDto.cycleRestDays
+                    } else {
+                        legacyInfo?.second?.second ?: mDto.cycleRestDays
+                    }
+                    val effectiveCycleStart = mDto.cycleStartDate ?: legacyInfo?.second?.third
+
                     medicationDao.upsertMedication(
                         MedicationEntity(
                             id = mDto.id,
                             name = mDto.name,
                             dosage = mDto.dosage,
-                            description = mDto.description
+                            description = mDto.description,
+                            daysOfWeekMask = effectiveMask,
+                            cycleActiveDays = effectiveCycleActive,
+                            cycleRestDays = effectiveCycleRest,
+                            cycleStartDate = effectiveCycleStart?.let(LocalDate::parse)
                         )
                     )
                 }
@@ -155,11 +195,7 @@ internal fun MedicationGroupEntity.toBackupDto(medicationIds: List<Long>) = Medi
     scheduledTime = scheduledTime.toString(),
     ringtoneUriString = ringtoneUriString,
     isActive = isActive,
-    daysOfWeekMask = daysOfWeekMask,
     advanceNoticeMinutes = advanceNoticeMinutes,
-    cycleActiveDays = cycleActiveDays,
-    cycleRestDays = cycleRestDays,
-    cycleStartDate = cycleStartDate?.toString(),
     medicationIds = medicationIds
 )
 
@@ -170,9 +206,5 @@ internal fun MedicationGroupDto.toEntity() = MedicationGroupEntity(
     scheduledTime = LocalTime.parse(scheduledTime),
     ringtoneUriString = ringtoneUriString,
     isActive = isActive,
-    daysOfWeekMask = daysOfWeekMask,
-    advanceNoticeMinutes = advanceNoticeMinutes,
-    cycleActiveDays = cycleActiveDays,
-    cycleRestDays = cycleRestDays,
-    cycleStartDate = cycleStartDate?.let(LocalDate::parse)
+    advanceNoticeMinutes = advanceNoticeMinutes
 )

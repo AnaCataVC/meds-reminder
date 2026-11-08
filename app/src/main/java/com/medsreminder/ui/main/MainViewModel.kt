@@ -126,7 +126,11 @@ class MainViewModel(
                 intent.id,
                 intent.name,
                 intent.dosage,
-                intent.description
+                intent.description,
+                intent.daysOfWeekMask,
+                intent.cycleActiveDays,
+                intent.cycleRestDays,
+                intent.cycleStartDate
             )
             is MainUiIntent.DeleteMedication -> deleteMedication(intent.medication)
             is MainUiIntent.SearchMedications -> _medicationSearchQuery.value = intent.query
@@ -232,7 +236,16 @@ class MainViewModel(
         }
     }
 
-    private fun saveMedication(id: Long, name: String, dosage: String?, description: String?) {
+    private fun saveMedication(
+        id: Long,
+        name: String,
+        dosage: String?,
+        description: String?,
+        daysOfWeekMask: Int,
+        cycleActiveDays: Int,
+        cycleRestDays: Int,
+        cycleStartDate: LocalDate?
+    ) {
         viewModelScope.launch {
             if (name.isBlank()) {
                 _sideEffects.send(MainSideEffect.ShowSnackbar("El nombre del medicamento es requerido"))
@@ -243,17 +256,25 @@ class MainViewModel(
                     id = id,
                     name = name.trim(),
                     dosage = dosage?.trim()?.takeIf { it.isNotEmpty() },
-                    description = description?.trim()?.takeIf { it.isNotEmpty() }
+                    description = description?.trim()?.takeIf { it.isNotEmpty() },
+                    daysOfWeekMask = daysOfWeekMask,
+                    cycleActiveDays = cycleActiveDays,
+                    cycleRestDays = cycleRestDays,
+                    cycleStartDate = cycleStartDate
                 )
             )
+            alarmScheduler.rescheduleAllActive()
             _sideEffects.send(MainSideEffect.ShowSnackbar("Medicamento guardado: $name"))
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
     private fun deleteMedication(medication: MedicationEntity) {
         viewModelScope.launch {
             medicationDao.deleteMedication(medication)
+            alarmScheduler.rescheduleAllActive()
             _sideEffects.send(MainSideEffect.ShowSnackbar("Medicamento eliminado: ${medication.name}"))
+            widgetUpdater?.notifyWidgetsChanged()
         }
     }
 
@@ -275,17 +296,15 @@ class MainViewModel(
                 name = intent.name.trim(),
                 scheduledTime = intent.scheduledTime,
                 ringtoneUriString = intent.ringtoneUriString,
-                daysOfWeekMask = intent.daysOfWeekMask,
                 isActive = true,
-                advanceNoticeMinutes = intent.advanceNoticeMinutes,
-                cycleActiveDays = intent.cycleActiveDays,
-                cycleRestDays = intent.cycleRestDays,
-                cycleStartDate = intent.cycleStartDate
+                advanceNoticeMinutes = intent.advanceNoticeMinutes
             )
 
             val savedId = groupDao.saveGroupWithMedicationIds(group, intent.medicationIds)
-            val updatedGroup = group.copy(id = savedId)
-            alarmScheduler.schedule(updatedGroup)
+            val updatedGroupWithMeds = groupDao.getGroupById(savedId)
+            if (updatedGroupWithMeds != null) {
+                alarmScheduler.schedule(updatedGroupWithMeds.group, updatedGroupWithMeds.medications)
+            }
 
             _sideEffects.send(MainSideEffect.ShowSnackbar("Horario programado: ${group.name}"))
             _sideEffects.send(MainSideEffect.NavigateBack)
@@ -310,7 +329,7 @@ class MainViewModel(
             val updated = groupWithMeds.group.copy(isActive = isActive)
             groupDao.updateGroup(updated)
             if (isActive) {
-                alarmScheduler.schedule(updated)
+                alarmScheduler.schedule(updated, groupWithMeds.medications)
                 _sideEffects.send(MainSideEffect.ShowSnackbar("Alarma activada"))
             } else {
                 alarmScheduler.cancel(updated)

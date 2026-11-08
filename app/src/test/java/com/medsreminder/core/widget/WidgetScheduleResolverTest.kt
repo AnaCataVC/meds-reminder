@@ -30,8 +30,7 @@ class WidgetScheduleResolverTest {
                 id = 10L,
                 personId = 1L,
                 name = "Desayuno Mamá",
-                scheduledTime = LocalTime.of(8, 0),
-                daysOfWeekMask = 127
+                scheduledTime = LocalTime.of(8, 0)
             ),
             medications = listOf(medLosartan)
         )
@@ -41,8 +40,7 @@ class WidgetScheduleResolverTest {
                 id = 20L,
                 personId = 2L,
                 name = "Desayuno Papá",
-                scheduledTime = LocalTime.of(8, 30),
-                daysOfWeekMask = 127
+                scheduledTime = LocalTime.of(8, 30)
             ),
             medications = listOf(medAspirin)
         )
@@ -81,8 +79,7 @@ class WidgetScheduleResolverTest {
                 personId = 1L,
                 name = "Inactive",
                 scheduledTime = LocalTime.of(8, 0),
-                isActive = false,
-                daysOfWeekMask = 127
+                isActive = false
             ),
             medications = emptyList()
         )
@@ -94,10 +91,9 @@ class WidgetScheduleResolverTest {
                 personId = 1L,
                 name = "Sunday Only",
                 scheduledTime = LocalTime.of(8, 0),
-                isActive = true,
-                daysOfWeekMask = 64
+                isActive = true
             ),
-            medications = emptyList()
+            medications = listOf(MedicationEntity(id = 103L, name = "Sunday Med", daysOfWeekMask = 64))
         )
 
         val result = WidgetScheduleResolver.resolveDailySchedule(
