@@ -13,3 +13,8 @@ captures/
 releases/
 /releases/
 .kotlin/
+
+# Android signing keystores
+*.jks
+*.keystore
+keystore.jks
