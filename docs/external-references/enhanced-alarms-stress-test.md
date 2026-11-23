@@ -20,11 +20,11 @@ A thorough adversarial analysis was conducted on the implementation across 5 fai
 ## 2. Identified Vulnerabilities & Stress-Test Vectors
 
 ### 🔴 Vector 1: Lockscreen Dismissal & Keyguard Security (Resolved)
-- **Vulnerability**: Dismissing Keyguard on high-security devices when the user touches an alarm button.
+- **Vulnerability**: Invoking `requestDismissKeyguard()` or `FLAG_DISMISS_KEYGUARD` when presenting an alarm over a locked device.
 - **Analysis**:
-  - `AlarmActivity` uses `setShowWhenLocked(true)` and `setTurnScreenOn(true)`.
-  - In Android 8.1+, `requestDismissKeyguard` allows the user to see the emergency pill intake UI without exposing background apps or personal content.
-  - Calling `finish()` after taking/snoozing the medication properly keeps the device in its previous lock state without security leaks.
+  - `AlarmActivity` uses `setShowWhenLocked(true)`, `setTurnScreenOn(true)`, and `FLAG_SHOW_WHEN_LOCKED` / `FLAG_TURN_SCREEN_ON` / `FLAG_KEEP_SCREEN_ON`.
+  - Calling `KeyguardManager.requestDismissKeyguard(this, null)` in `onCreate()` forces Android (and OEM skins like Samsung One UI) to display the PIN/pattern/biometric unlock prompt *on top* of `AlarmActivity`, preventing the user from tapping the alarm dismissal buttons while the device is locked.
+  - By omitting `requestDismissKeyguard` and `FLAG_DISMISS_KEYGUARD`, `AlarmActivity` renders directly above the locked keyguard so the user can confirm, snooze, or skip the alarm immediately with a single tap, and `finish()` returns cleanly to the locked screen.
 
 ### 🟡 Vector 2: State Drift in Early Intake via Pre-Alarm (Hardened)
 - **Vulnerability**: If the user confirms a dose 15 minutes early via the pre-alarm notification, what happens to the exact alarm scheduled for 15 minutes later?
