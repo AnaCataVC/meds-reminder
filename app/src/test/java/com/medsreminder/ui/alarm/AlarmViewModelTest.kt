@@ -1,10 +1,12 @@
 package com.medsreminder.ui.alarm
 
+import android.view.WindowManager
 import app.cash.turbine.test
 import com.medsreminder.core.alarm.AlarmSettings
 import com.medsreminder.core.notification.NotificationHelper
 import com.medsreminder.data.local.dao.MedicationGroupDao
 import com.medsreminder.data.local.dao.PersonDao
+import com.medsreminder.data.local.entity.MedicationEntity
 import com.medsreminder.data.local.entity.MedicationGroupEntity
 import com.medsreminder.data.local.entity.MedicationGroupWithMedications
 import com.medsreminder.data.local.entity.PersonEntity
@@ -173,6 +175,54 @@ class AlarmViewModelTest {
         testDispatcher.scheduler.advanceUntilIdle()
 
         coVerify(exactly = 1) { mockScheduleRepository.skipSchedule(10L, any()) }
+        assertTrue(viewModel.uiState.value.isFinished)
+    }
+
+    @Test
+    @Suppress("DEPRECATION")
+    fun `lockScreenWindowFlags enables lockscreen display without requesting keyguard dismissal`() {
+        val flags = AlarmActivity.LOCK_SCREEN_WINDOW_FLAGS
+
+        // Must show over lockscreen, wake display, and keep screen on
+        assertTrue(flags and WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED != 0)
+        assertTrue(flags and WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON != 0)
+        assertTrue(flags and WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON != 0)
+
+        // MUST NOT request keyguard dismissal, which triggers PIN/biometric overlay blocking alarm dismissal
+        assertEquals(0, flags and WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD)
+    }
+
+    @Test
+    fun `confirmPartial with large medication list resolves all items and finishes activity`() = runTest {
+        val manyMedications = (1L..12L).map { id ->
+            MedicationEntity(id = id, name = "Medicamento $id", dosage = "${id * 10}mg")
+        }
+        val largeGroup = MedicationGroupWithMedications(
+            group = sampleGroup,
+            medications = manyMedications
+        )
+        coEvery { mockGroupDao.getGroupById(10L) } returns largeGroup
+
+        viewModel.loadAlarm(10L)
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        assertEquals(12, viewModel.uiState.value.groupWithMeds?.medications?.size)
+
+        val takenIds = (1L..10L).toList()
+        val skippedIds = listOf(11L, 12L)
+        viewModel.confirmPartial(takenIds, skippedIds)
+
+        verify(exactly = 1) { mockNotificationHelper.cancelAllForGroup(10L) }
+        testDispatcher.scheduler.advanceUntilIdle()
+
+        coVerify(exactly = 1) {
+            mockScheduleRepository.confirmPartialIntake(
+                groupId = 10L,
+                date = any(),
+                takenMedicationIds = takenIds,
+                skippedMedicationIds = skippedIds
+            )
+        }
         assertTrue(viewModel.uiState.value.isFinished)
     }
 }

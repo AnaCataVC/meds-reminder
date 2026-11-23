@@ -1,7 +1,5 @@
 package com.medsreminder.ui.alarm
 
-import android.app.KeyguardManager
-import android.content.Context
 import android.content.Intent
 import android.graphics.Color as AndroidColor
 import android.os.Build
@@ -14,9 +12,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Alarm
 import androidx.compose.material.icons.filled.Check
@@ -55,6 +55,13 @@ class AlarmActivity : ComponentActivity() {
 
     companion object {
         const val EXTRA_GROUP_ID = "extra_group_id"
+
+        @Suppress("DEPRECATION")
+        const val LOCK_SCREEN_WINDOW_FLAGS: Int =
+            WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
+                WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON or
+                WindowManager.LayoutParams.FLAG_ALLOW_LOCK_WHILE_SCREEN_ON
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -104,17 +111,8 @@ class AlarmActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
             setShowWhenLocked(true)
             setTurnScreenOn(true)
-            val keyguardManager = getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            keyguardManager.requestDismissKeyguard(this, null)
-        } else {
-            @Suppress("DEPRECATION")
-            window.addFlags(
-                WindowManager.LayoutParams.FLAG_SHOW_WHEN_LOCKED or
-                        WindowManager.LayoutParams.FLAG_DISMISS_KEYGUARD or
-                        WindowManager.LayoutParams.FLAG_TURN_SCREEN_ON
-            )
         }
-        window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        window.addFlags(LOCK_SCREEN_WINDOW_FLAGS)
     }
 }
 
@@ -191,6 +189,8 @@ fun AlarmPopupContent(
         label = "pulseScale"
     )
 
+    val medsScrollState = rememberScrollState()
+
     Surface(
         modifier = Modifier.fillMaxSize(),
         color = MaterialTheme.colorScheme.background
@@ -207,7 +207,8 @@ fun AlarmPopupContent(
                         )
                     )
                 )
-                .padding(24.dp)
+                .safeDrawingPadding()
+                .padding(horizontal = 24.dp, vertical = 16.dp)
         ) {
             Column(
                 modifier = Modifier
@@ -219,12 +220,12 @@ fun AlarmPopupContent(
                 // Header & Pulsing Icon
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(top = 24.dp)
+                    modifier = Modifier.padding(top = 8.dp)
                 ) {
                     Box(
                         modifier = Modifier
                             .scale(pulseScale)
-                            .size(90.dp)
+                            .size(76.dp)
                             .clip(CircleShape)
                             .background(personColor),
                         contentAlignment = Alignment.Center
@@ -233,11 +234,11 @@ fun AlarmPopupContent(
                             imageVector = Icons.Default.Alarm,
                             contentDescription = "Alarma",
                             tint = Color.White,
-                            modifier = Modifier.size(52.dp)
+                            modifier = Modifier.size(44.dp)
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(18.dp))
+                    Spacer(modifier = Modifier.height(12.dp))
 
                     Surface(
                         shape = RoundedCornerShape(16.dp),
@@ -252,7 +253,7 @@ fun AlarmPopupContent(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
                         text = group.scheduledTime.format(DateTimeFormatter.ofPattern("hh:mm a")),
@@ -269,9 +270,12 @@ fun AlarmPopupContent(
                     )
                 }
 
-                // Medication Cards Summary
+                // Medication Cards Summary (Bounded & Scrollable so action buttons are never pushed off-screen)
                 Card(
-                    modifier = Modifier.fillMaxWidth(),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 12.dp)
+                        .weight(1f, fill = false),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
@@ -301,88 +305,94 @@ fun AlarmPopupContent(
                         }
                         Spacer(modifier = Modifier.height(10.dp))
 
-                        if (activeMeds.isEmpty()) {
-                            Text(
-                                text = "Sin medicamentos especificados",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.outline
-                            )
-                        } else if (showIndividualSelection) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                activeMeds.forEach { med ->
-                                    val isChecked = selectedMedicationIds[med.id] ?: true
-                                    Surface(
-                                        shape = RoundedCornerShape(12.dp),
-                                        color = if (isChecked) {
-                                            MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
-                                        } else {
-                                            MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
-                                        },
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable { selectedMedicationIds[med.id] = !isChecked }
-                                    ) {
-                                        Row(
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .verticalScroll(medsScrollState)
+                        ) {
+                            if (activeMeds.isEmpty()) {
+                                Text(
+                                    text = "Sin medicamentos especificados",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                            } else if (showIndividualSelection) {
+                                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                                    activeMeds.forEach { med ->
+                                        val isChecked = selectedMedicationIds[med.id] ?: true
+                                        Surface(
+                                            shape = RoundedCornerShape(12.dp),
+                                            color = if (isChecked) {
+                                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.4f)
+                                            } else {
+                                                MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                                            },
                                             modifier = Modifier
                                                 .fillMaxWidth()
-                                                .padding(horizontal = 12.dp, vertical = 8.dp),
-                                            verticalAlignment = Alignment.CenterVertically
+                                                .clickable { selectedMedicationIds[med.id] = !isChecked }
                                         ) {
-                                            Checkbox(
-                                                checked = isChecked,
-                                                onCheckedChange = { selectedMedicationIds[med.id] = it },
-                                                colors = CheckboxDefaults.colors(
-                                                    checkedColor = personColor,
-                                                    checkmarkColor = Color.White
-                                                )
-                                            )
-                                            Spacer(modifier = Modifier.width(8.dp))
-                                            Column(modifier = Modifier.weight(1f)) {
-                                                Text(
-                                                    text = med.name,
-                                                    style = MaterialTheme.typography.bodyLarge,
-                                                    fontWeight = FontWeight.SemiBold,
-                                                    color = if (isChecked) {
-                                                        MaterialTheme.colorScheme.onSurface
-                                                    } else {
-                                                        MaterialTheme.colorScheme.outline
-                                                    }
-                                                )
-                                                med.dosage?.let {
-                                                    Text(
-                                                        text = it,
-                                                        style = MaterialTheme.typography.bodySmall,
-                                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                            Row(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Checkbox(
+                                                    checked = isChecked,
+                                                    onCheckedChange = { selectedMedicationIds[med.id] = it },
+                                                    colors = CheckboxDefaults.colors(
+                                                        checkedColor = personColor,
+                                                        checkmarkColor = Color.White
                                                     )
+                                                )
+                                                Spacer(modifier = Modifier.width(8.dp))
+                                                Column(modifier = Modifier.weight(1f)) {
+                                                    Text(
+                                                        text = med.name,
+                                                        style = MaterialTheme.typography.bodyLarge,
+                                                        fontWeight = FontWeight.SemiBold,
+                                                        color = if (isChecked) {
+                                                            MaterialTheme.colorScheme.onSurface
+                                                        } else {
+                                                            MaterialTheme.colorScheme.outline
+                                                        }
+                                                    )
+                                                    med.dosage?.let {
+                                                        Text(
+                                                            text = it,
+                                                            style = MaterialTheme.typography.bodySmall,
+                                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                        )
+                                                    }
                                                 }
                                             }
                                         }
                                     }
                                 }
-                            }
-                        } else {
-                            FlowRow(
-                                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                activeMeds.forEach { med ->
-                                    SuggestionChip(
-                                        onClick = {},
-                                        label = {
-                                            Text(
-                                                text = "${med.name}${med.dosage?.let { " ($it)" } ?: ""}",
-                                                fontWeight = FontWeight.SemiBold
-                                            )
-                                        },
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Default.Medication,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(18.dp),
-                                                tint = personColor
-                                            )
-                                        }
-                                    )
+                            } else {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    activeMeds.forEach { med ->
+                                        SuggestionChip(
+                                            onClick = {},
+                                            label = {
+                                                Text(
+                                                    text = "${med.name}${med.dosage?.let { " ($it)" } ?: ""}",
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                            },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Medication,
+                                                    contentDescription = null,
+                                                    modifier = Modifier.size(18.dp),
+                                                    tint = personColor
+                                                )
+                                            }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -393,7 +403,7 @@ fun AlarmPopupContent(
                 Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(bottom = 16.dp),
+                        .padding(bottom = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (showIndividualSelection && takenCount in 1 until totalMeds) {
