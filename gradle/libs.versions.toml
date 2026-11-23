@@ -13,7 +13,7 @@ coroutines = "1.8.1"
 junit = "4.13.2"
 mockk = "1.13.11"
 turbine = "1.1.0"
-materialIcons = "1.6.8"
+materialIcons = "1.7.8"
 navigationCompose = "2.8.0"
 glance = "1.1.1"
 
